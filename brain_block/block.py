@@ -4,23 +4,23 @@ import numpy as np
 
 class block:
     """
-    根据自定的网络结构和神经元模型参数（LIF），模拟脉冲神经网络
+    According to the determined network structure and neuron model parameter (LIF), simulate pulse neural network.
 
-    具体示例参见 `User Guide`_.
+    ref `user guide`.
 
     Parameters
     ----------
 
     node_property: Tensor
-        shape=(N, 21), N表示神经元个数，21表示一共21个神经元参数，具体见模型介绍
+        shape=(N, 21), N denotes number of neurons，21 denotes 21 attributes of LIF neuron.
 
     w_uij:  Tensor
-        shape=(4, N, N), N表示神经元个数，4表示4个突触通道： AMPA, NMDA, GABAa and GABAb
+        shape=(4, N, N), 4 denotes 4 different synatpic channels： AMPA, NMDA, GABAa and GABAb.
 
     delta_t: float
-        迭代时间，单位为 ms
+        Iteration time, unit: milliseconds.
     src: Tensor
-        默认是 None, 否则用Tensor表示指定神经元和指定发放
+        The default is none, otherwise, tensor is used to indicate the designated neuron and the designated firing.
 
 
     """
