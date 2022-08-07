@@ -9,7 +9,10 @@ import numpy as np
 def sample(aal_region, neurons_per_population_base, populations_id, specified_info=None, num_sample_voxel_per_region=1,
                                        num_neurons_per_voxel=300):
     """
-    sample neurons from the simulation object according requirement.
+    sample neurons from the ``simulation`` object according requirement.
+
+    In simulation object :std:ref:`simulation`, it's required to set neuron sample before ``simulation.run``.
+
 
     Parameters
     ----------
@@ -18,16 +21,18 @@ def sample(aal_region, neurons_per_population_base, populations_id, specified_in
         indicate the brain regions label of each voxel.
 
     neurons_per_population_base: ndarray
-        The accumulated number of neurons for each population , corresponding to the *population_id*.
+        The accumulated number of neurons for each population , corresponding to the population_id.
 
     populations_id: ndarray
         The population id. Due to the routing algorithm, the population id may be disordered and repeated.
         The population id of neurons distributed between consecutive cards may be duplicated,
         because the neurons of this population may not be completely divided into one card.
 
-    num_sample_voxel_per_region: int
+    num_sample_voxel_per_region: int, default=1
+        the sample number of voxels in each region.
 
-    num_neurons_per_voxel: int
+    num_neurons_per_voxel: int, default=300
+        the sample number of neurons in each voxel .
 
     specified_info: ndarray
         according the specified_info info , we can randomly sample neurons which are from given voxel id.
@@ -37,11 +42,12 @@ def sample(aal_region, neurons_per_population_base, populations_id, specified_in
 
     ndarray which contain sample information
 
-    -0th column          neuron id
-    -1th column          voxel id
-    -2th column          population id
-    -3th column          region id
-
+    ----------------|------------------
+    0 th column     |     neuron id
+    1 th column     |    voxel id
+    2 th column     |    population id
+    3 th column     |    region id
+    ----------------|------------------
 
     """
     subcortical = np.array([37, 38, 41, 42, 71, 72, 73, 74, 75, 76, 77, 78], dtype=np.int64) - 1  # region index from 0

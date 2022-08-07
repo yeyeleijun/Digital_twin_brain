@@ -1,14 +1,18 @@
-brain\_block package
+brain\_block
 ====================
 
-brain\_block.block
+.. _block:
+
+block
 -------------------------
 
-.. automodule:: brain_block.block
+.. autoclass:: brain_block.block.block
    :members:
+   :undoc-members:
 
-brain\_block.bold\_model\_pytorch
+bold\_model\_pytorch
 ----------------------------------------
 
-.. automodule:: brain_block.bold_model_pytorch
+.. autoclass:: brain_block.bold_model_pytorch.BOLD
    :members:
+   :undoc-members:

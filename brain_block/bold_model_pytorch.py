@@ -5,11 +5,9 @@ import time
 
 class BOLD:
     """
-    Hemodynamical model, bridge the gap from population fire rate to bold signal.
-    More detail, ref ref_.
-
-    .. _ref: https://www.sciencedirect.com/science/article/pii/S105381190090630X
-
+    Ballon model, transforms the fire rate (e.g., generated from :std:ref:`block`) to BOLD signal through a
+    approximate convolutional dynamic equation.
+    More detail, ref `here <https://www.sciencedirect.com/science/article/pii/S105381190090630X>`_.
     """
     def __init__(self, epsilon, tao_s, tao_f, tao_0, alpha, E_0, V_0,
                  delta_t=1e-3, init_f_in=None, init_s=None, init_v=None, init_q=None):

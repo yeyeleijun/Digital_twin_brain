@@ -8,6 +8,14 @@ Welcome to DTB's documentation!
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :numbered:
+   :caption: User Guide:
+
+   rstfiles/user_guide
+
+.. toctree::
+   :maxdepth: 2
+   :numbered:
+   :caption: Modules:
 
    rstfiles/modules

@@ -17,7 +17,6 @@ def draw(log_path, freqs, block_size, sample_idx, write_path, name_path, bold_pa
     """
     Draw some valid figures for returned info from block simulation.
     More detail ref to source code.
-    -------
 
     """
     log = np.load(log_path)

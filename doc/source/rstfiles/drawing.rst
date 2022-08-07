@@ -1,8 +1,9 @@
-drawing package
+drawing
 ===============
 
-drawing.draw
+draw
 -------------------
 
 .. automodule:: drawing.draw
    :members:
+   :undoc-members:

@@ -8,7 +8,17 @@ import prettytable as pt
 
 def pretty_print(content: str):
     """
-    pretty print something.
+    pretty print something inside a box.
+
+    Parameters
+    ----------
+    content: str
+        the information to print.
+
+    Examples
+    --------
+
+    >>> pretty_print("Initialization")
 
     """
     screen_width = 80
@@ -26,16 +36,16 @@ def pretty_print(content: str):
 
 def table_print(content: dict, n_rows=None, n_columns=None):
     """
-    display something in a table.
+    display something inside a table.
 
     Parameters
     ----------
-    content
-    n_rows
-    n_columns
+    content: dict
+        key-value represent the variable name and variable value.
 
-    Returns
-    -------
+    n_rows: int
+
+    n_columns: int
 
     """
     assert isinstance(content, dict)

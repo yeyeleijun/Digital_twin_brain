@@ -1,14 +1,14 @@
-utils package
+utils
 =============
 
-utils.helpers
+helpers
 --------------------
 
 .. automodule:: utils.helpers
    :members:
    :undoc-members:
 
-utils.pretty\_print
+pretty\_print
 --------------------------
 
 .. automodule:: utils.pretty_print
@@ -16,7 +16,7 @@ utils.pretty\_print
    :undoc-members:
 
 
-utils.sample
+sample
 -------------------
 
 .. automodule:: utils.sample

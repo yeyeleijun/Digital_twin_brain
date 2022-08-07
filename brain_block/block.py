@@ -4,9 +4,11 @@ import numpy as np
 
 class block:
     """
-    According to the determined network structure and neuron model parameter (LIF), simulate pulse neural network.
+    According to the determined network structure and neuron model parameter ``(LIF)``, simulate spike neural network.
+     Detail ref :std:ref:`user guide`.
 
-    ref `user guide`.
+    A cpu code to simulate the spike network with the pytorch framework and gpu accelerating.
+    In real ``large-scale`` simulation, We use CUDA accelerated ``DTB`` platform.
 
     Parameters
     ----------

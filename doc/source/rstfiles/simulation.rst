@@ -1,7 +1,9 @@
 simulation package
 ==================
 
-simulation.simulation
+.. _simulation:
+
+simulation
 ----------------------------
 
 .. automodule:: simulation.simulation

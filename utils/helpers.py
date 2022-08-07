@@ -3,11 +3,34 @@
 # @Author : lepold
 # @File : helpers.py
 
+"""
+Here are some simple Numpy functions or torch functions that help to achieve simulation or assimilation.
+
+"""
+
+
+import os
 import torch
 import numpy as np
 
 
 def np_move_avg(a, n=10, mode="valid"):
+    """
+    Calculate the moving average of the signal
+
+    Parameters
+    ----------
+    a: ndarray
+        1-dim or 2-dim ndarray, like (time_dim, variable_dim)
+    n: int
+        window lenght
+    mode: str
+        the options in ``np.convolve``.
+
+    Returns
+    -------
+
+    """
     if a.ndim > 1:
         tmp = []
         for i in range(a.shape[1]):
@@ -17,7 +40,12 @@ def np_move_avg(a, n=10, mode="valid"):
         tmp = np.convolve(a, np.ones((n,)) * 1000 / n, mode=mode)
     return tmp
 
+
 def torch_2_numpy(u, is_cuda=True):
+    """
+    Convert ``torch.Tensor`` to ``numpy.ndarray`` in cpu memory.
+
+    """
     assert isinstance(u, torch.Tensor)
     if is_cuda:
         return u.cpu().numpy()
@@ -26,6 +54,9 @@ def torch_2_numpy(u, is_cuda=True):
 
 
 def load_if_exist(func, *args, **kwargs):
+    """
+    Load npy if exist else generate it by ``func``.
+    """
     path = os.path.join(*args)
     if os.path.exists(path + ".npy"):
         out = np.load(path + ".npy")
