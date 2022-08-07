@@ -9,9 +9,11 @@ import time
 import numpy as np
 import torch
 from default_param import bold_params, v_th
-from cuda.python.dist_blockwrapper_pytorch import BlockWrapper as block
+# from cuda.python.dist_blockwrapper_pytorch import BlockWrapper as block
 from brain_block.bold_model_pytorch import BOLD
-from utils import *
+from utils.pretty_print import pretty_print, table_print
+from utils.helpers import load_if_exist
+from utils.sample import sample
 
 
 class simulation(object):

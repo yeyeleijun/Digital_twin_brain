@@ -9,7 +9,7 @@ from scipy.io import loadmat
 import pandas as pd
 import torch
 import matplotlib.pyplot as plt
-from utils import np_move_avg
+from utils.helpers import np_move_avg
 
 
 def draw(log_path, freqs, block_size, sample_idx, write_path, name_path, bold_path, real_bold_path, vmean_path,
