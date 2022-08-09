@@ -1,4 +1,4 @@
-simulation package
+simulation
 ==================
 
 .. _simulation:

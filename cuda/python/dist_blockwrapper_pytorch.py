@@ -32,7 +32,7 @@ class BlockWrapper:
     MAX_MESSAGE_LENGTH = 2147483647
     buffersize = 1024 ** 3 // 4
 
-    def __init__(self, address, path, delta_t, route_path=None, print_stat=False, force_rebase=False, cortical_size=1):
+    def __init__(self, address, path, delta_t, route_path=None, print_stat=False, force_rebase=False, overlap=1):
         self.print_stat = print_stat
         self._channel = grpc.insecure_channel(address,
             options = [('grpc.max_send_message_length', self.MAX_MESSAGE_LENGTH),
@@ -55,7 +55,7 @@ class BlockWrapper:
         self.pool = Pool()
 
         subblk_base = 0
-        cortical_subblk_start = 0 if cortical_size==1 else 2
+        cortical_subblk_start = 0 if overlap==1 else 2
 
         for i, resp in enumerate(_init_resp):
             assert (resp.status == SnnStatus.SNN_OK)
@@ -65,7 +65,7 @@ class BlockWrapper:
                 if j == 0 and sinfo.subblk_id == cortical_subblk_start and len(subblk_info) > 0:
                     new_base = max([id for id, _ in subblk_info])
                     if force_rebase or new_base != cortical_subblk_start:
-                        subblk_base = (new_base + 1 + cortical_size - 1) // cortical_size * cortical_size
+                        subblk_base = (new_base + 1 + overlap - 1) // overlap * overlap
                 subblk_info.append((sinfo.subblk_id + subblk_base, sinfo.subblk_num))
             self._subblk_id_per_block[resp.block_id] = \
                 (subblk_base, torch.unique(torch.tensor([sinfo.subblk_id + subblk_base for sinfo in resp.subblk_info], dtype=torch.int64).cuda()))

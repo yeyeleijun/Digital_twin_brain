@@ -17,4 +17,4 @@ biological counterpart both at resting state and in action.
 
    rstfiles/install
    rstfiles/user_guide
-   rstfiles/modules
+   modules
