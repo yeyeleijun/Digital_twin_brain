@@ -8,6 +8,7 @@
 import os.path
 import sys
 from os.path import dirname, abspath
+from recommonmark.parser import CommonMarkParser
 
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 sys.path.append(os.path.join(dirname(dirname(dirname(abspath(__file__)))), 'utils'))
@@ -28,7 +29,10 @@ extensions = ['sphinx.ext.autodoc',
 templates_path = ['_templates']
 exclude_patterns = ['cuda', 'default_param.py']
 
-
+source_parsers = {
+    '.md': CommonMarkParser,
+}
+source_suffix = ['.rst', '.md']
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
