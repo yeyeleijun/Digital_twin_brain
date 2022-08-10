@@ -14,7 +14,7 @@ class block:
     ----------
 
     node_property: Tensor
-        shape=(N, 21), N denotes number of neurons，21 denotes 21 attributes of LIF neuron.
+        shape=(N, 23), N denotes number of neurons，23 denotes 23 attributes of LIF neuron.
 
     w_uij:  Tensor
         shape=(4, N, N), 4 denotes 4 different synatpic channels： AMPA, NMDA, GABAa and GABAb.

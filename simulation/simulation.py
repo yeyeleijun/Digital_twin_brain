@@ -228,11 +228,11 @@ class simulation(object):
             .. versionadded:: 1.0
 
         """
-        self.vmean_option = vmean_option
-        self.sample_option = sample_option
+        # self.vmean_option = vmean_option
+        # self.sample_option = sample_option
         total_res = []
 
-        for return_info in self.block_model.run(step, freqs=True, vmean=self.vmean_option, sample_for_show=self.sample_option):
+        for return_info in self.block_model.run(step, freqs=True, vmean=vmean_option, sample_for_show=sample_option):
             Freqs, *others = return_info
             total_res.append(return_info)
 
@@ -305,7 +305,7 @@ class simulation(object):
                 t_sim_start = time.time()
                 if hp_total is not None:
                     self.block_model.mul_property_by_subblk(population_info, hp_total[i, :])
-                out = self.evolve(step)
+                out = self.evolve(step, vmean_option=self.vmean_option, sample_option=self.sample_option)
                 FFreqs[j] = torch_2_numpy(out[0])
                 if self.vmean_option:
                     Vmean[j] = torch_2_numpy(out[1])
