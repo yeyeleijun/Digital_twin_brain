@@ -13,7 +13,7 @@ from default_param import bold_params, v_th
 from models.bold_model_pytorch import BOLD
 from utils.pretty_print import pretty_print, table_print
 from utils.helpers import load_if_exist, torch_2_numpy
-from utils.sample import sample
+from utils.sample import specified_sample
 
 
 class simulation(object):
@@ -137,7 +137,7 @@ class simulation(object):
         beta = torch.ones(self.total_populations, device="cuda:0") * 1e8
         self.block_model.gamma_property_by_subblk(population_info, alpha, beta, debug=False)
 
-    def sample(self, aal_region, specified_info=None):
+    def sample(self, aal_region, population_base, specified_info=None):
         """
 
         set sample idx of neurons in this simulation object.
@@ -148,18 +148,14 @@ class simulation(object):
         aal_region: ndarray
             indicate the brain regions label of each voxel appeared in this simulation.
 
+        population_base: ndarray
+            indicate range of neurons in each population.
+
         """
 
-        num_voxel = len(aal_region)
-        neurons_per_population = self.block_model._neurons_per_subblk.cpu().numpy()
-        neurons_per_population_base = np.add.accumulate(neurons_per_population)
-        neurons_per_population_base = np.insert(neurons_per_population_base, 0, 0)
-        populations_cpu = self.block_model._subblk_id[self.block_model._subblk_idx].cpu().numpy()
-
-        sample_idx = load_if_exist(sample, os.path.join(self.write_path, "sample_idx"),
+        sample_idx = load_if_exist(specified_sample, os.path.join(self.write_path, "sample_idx"),
                                    aal_region=aal_region,
-                                   neurons_per_population_base=neurons_per_population_base,
-                                   populations_id=populations_cpu, specified_info=specified_info)
+                                   neurons_per_population_base=population_base,specified_info=specified_info)
         sample_idx = torch.from_numpy(sample_idx).cuda()[:, 0]
         num_sample = sample_idx.shape[0]
         assert sample_idx[:, 0].max() < self.total_neurons
@@ -167,7 +163,8 @@ class simulation(object):
         load_if_exist(lambda: self.block_model.neurons_per_subblk.cpu().numpy(),
                       os.path.join(self.write_path, "blk_size"))
         self.num_sample = num_sample
-        return num_sample, num_voxel
+
+        return num_sample
 
     def gamma_initialize(self, param_index, alpha=5., beta=5.):
         """

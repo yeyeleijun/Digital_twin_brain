@@ -65,7 +65,7 @@ class BlockWrapper:
                 if j == 0 and sinfo.subblk_id == cortical_subblk_start and len(subblk_info) > 0:
                     new_base = max([id for id, _ in subblk_info])
                     if force_rebase or new_base != cortical_subblk_start:
-                        subblk_base = (new_base + 1 + overlap - 1) // overlap * overlap
+                        subblk_base = (new_base + overlap - 1) // overlap * overlap
                 subblk_info.append((sinfo.subblk_id + subblk_base, sinfo.subblk_num))
             self._subblk_id_per_block[resp.block_id] = \
                 (subblk_base, torch.unique(torch.tensor([sinfo.subblk_id + subblk_base for sinfo in resp.subblk_info], dtype=torch.int64).cuda()))

@@ -8,6 +8,8 @@
 import unittest
 import h5py
 # from mpi4py import MPI
+import numpy as np
+
 from generation.make_block import *
 import sparse
 
@@ -35,8 +37,8 @@ class TestBlock(unittest.TestCase):
                                22.1 * 83, 22.1 * 17], dtype=np.float64)  # ignore the L1 neurons
         else:
             # 4:1 setting
-            lcm_connect_prob = np.array([[0.5, 0.2, 0.3],
-                                         [0.5, 0.2, 0.3]], dtype=np.float64)
+            lcm_connect_prob = np.array([[0.3, 0.2, 0.5],
+                                         [0.3, 0.2, 0.5]], dtype=np.float64)
             lcm_gm = np.array([0.8, 0.2], dtype=np.float64)
 
         lcm_gm /= lcm_gm.sum()
@@ -105,7 +107,7 @@ class TestBlock(unittest.TestCase):
                                      [0, 0, 80, 8, 92, 3, 159, 11, 76, 499, 1794]], dtype=np.float64
                                     )
 
-        # wenyong setting（3/8， 1/8, 5/8), cortical colulmn is（4/7， 1/7， 2/7）
+        # wenyong setting（0.3， 0.3, 0.5), cortical colulmn is（4/7， 1/7， 2/7）
         lcm_connect_prob_subcortical = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                                  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                                  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -232,12 +234,35 @@ class TestBlock(unittest.TestCase):
             out_conn_prob = out_conn_prob / out_conn_prob.sum(axis=1, keepdims=True)
         return out_conn_prob, out_gm, out_degree_scale
 
-    def test_make_whole_brain_include_cortical_laminar_and_suncortical_voxel_model(self,
+    def test_make_whole_brain_include_cortical_laminar_and_subcortical_voxel_model(self,
                                                                                    path="./laminar_structure_whole_brain_include_subcortical/200m_structure_d100",
                                                                                    degree=100,
                                                                                    minmum_neurons_for_block=0,
                                                                                    scale=int(2e8),
                                                                                    blocks=40):
+        """
+        generate the whole brian connection table at the cortical-column version, and generate index file of populations.
+        In simulation, we can use the population_base.npy to sample which neurons we need to track.
+
+        Parameters
+        ----------
+        path: str
+            the path to save information.
+
+        degree: int
+            default is 100.
+
+        minmum_neurons_for_block: int
+            In cortical-column version, it must be zero.
+
+        scale: int
+            simualation size.
+
+        blocks : int
+            equals number of gpu cards.
+
+
+        """
         os.makedirs(path, exist_ok=True)
         whole_brain = np.load(
             '/public/home/ssct004t/project/zenglb/spiking_nn_for_simulation/whole_brain_voxel_info.npz')
@@ -273,6 +298,12 @@ class TestBlock(unittest.TestCase):
                    "size": int(max(b * scale, minmum_neurons_for_block))
                    }
                   for i, b in enumerate(block_size)]
+
+        population_base = np.array([kword['size'] for kword in kwords], dtype=np.uin8)
+        population_base = np.add.accumulate(population_base)
+        population_base = np.insert(population_base, 0, 0)
+        os.makedirs(os.path.join(path, 'single'), exist_ok=True)
+        np.save(os.path.join(path, 'single', "population_base.npy"), population_base)
 
         conn = connect_for_multi_sparse_block(conn_prob, kwords,
                                               degree=degree,
@@ -323,6 +354,13 @@ class TestBlock(unittest.TestCase):
                    'tao_ui': (2, 40, 10, 50),
                    "size": int(max(b * scale, minmum_neurons_for_block))}
                   for i, b in enumerate(block_size)]
+
+        population_base = np.array([kword['size'] for kword in kwords], dtype=np.uin8)
+        population_base = np.add.accumulate(population_base)
+        population_base = np.insert(population_base, 0, 0)
+        os.makedirs(os.path.join(path, 'single'), exist_ok=True)
+        np.save(os.path.join(path, 'single', "population_base.npy"), population_base)
+
         conn = connect_for_multi_sparse_block(conn_prob, kwords,
                                               degree=degree,
                                               init_min=0,
@@ -337,6 +375,7 @@ class TestBlock(unittest.TestCase):
                                            number=blocks,
                                            dtype="single",
                                            debug_block_dir=None)
+
 
     def _test_generate_EI_big_network(self, path="./canonical_ei_big_network", degree=100,
                                       minmum_neurons_for_block=1000,
