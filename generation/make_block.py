@@ -25,7 +25,7 @@ Generating logic can be basically broken down into the following two steps:
 import torch
 import numpy as np
 import os
-# from multiprocessing.pool import Pool as pool
+from multiprocessing.pool import Pool as pool
 from multiprocessing.pool import ThreadPool as Thpool
 from generation.read_block import connect_for_block
 from numba import jit
@@ -76,7 +76,7 @@ def get_k_idx(max_k, num, except_idx):  # , destination, orign
     return k_idx
 
 
-def connect_for_multi_sparse_block(population_connect_prob, population_node_init_kwards=None, degree=int(1e3),
+def connect_for_multi_sparse_block(population_connect_prob, population_node_init_kwards=None, degree=int(1e3), prefix=None,
                                    init_min=0, init_max=1):
     """
     Main api to generate connection table and save in npz file, if given information contain connection portability of populations,
@@ -92,8 +92,13 @@ def connect_for_multi_sparse_block(population_connect_prob, population_node_init
         if list, it mush be [dict, dict, ..] and contains each population information.
     degree: ndarray or int
         specified degree of each population.
+
+    prefix: str or None
+        specifies the way of generation, 1)writing to prefix 2) return a closure.
+
     init_min: float
         the lower bound of weight
+
     init_max: float
         the upper bound of weight
 
@@ -120,51 +125,82 @@ def connect_for_multi_sparse_block(population_connect_prob, population_node_init
 
     print('total {} populations'.format(N))
 
-    def _out():
-        if isinstance(population_node_init_kwards, dict):
-            number = [population_node_init_kwards['size']] * N
-        elif isinstance(population_node_init_kwards, list):
-            number = [b['size'] for b in population_node_init_kwards]
-        else:
-            raise ValueError
-
-        bases = np.add.accumulate(np.array(number, dtype=np.int64))
-        bases = np.concatenate([np.array([0], dtype=np.int64), bases])
-
-        def prop(i, s, e):
-            block_node_init_kward = population_node_init_kwards[i] if isinstance(population_node_init_kwards,
-                                                                                 list) else population_node_init_kwards
-            if 'sub_block_idx' not in block_node_init_kward:
-                return generate_block_node_property(sub_block_idx=i, s=s, e=e, **block_node_init_kward)
+    if prefix is None:
+        def _out():
+            if isinstance(population_node_init_kwards, dict):
+                number = [population_node_init_kwards['size']] * N
+            elif isinstance(population_node_init_kwards, list):
+                number = [b['size'] for b in population_node_init_kwards]
             else:
-                return generate_block_node_property(s=s, e=e, **block_node_init_kward)
+                raise ValueError
 
-        def conn(i, s, e):
-            prob = population_connect_prob[i, :]
-            step = int(1e6)
-            for _s in range(s, e, step):
-                _e = min(_s + step, e)
-                output_neuron_idx, input_block_idx, input_neuron_idx, input_neuron_offset, connect_weight = \
-                    connect_for_single_sparse_block(i, bases[i + 1] - bases[i],
-                                                    prob,
-                                                    s=_s,
-                                                    e=_e,
-                                                    extern_input_k_sizes=extern_input_k_sizes,
-                                                    degree=degree if not isinstance(degree, np.ndarray) else degree[
-                                                        i],
-                                                    init_min=init_min,
-                                                    init_max=init_max)
+            bases = np.add.accumulate(np.array(number, dtype=np.int64))
+            bases = np.concatenate([np.array([0], dtype=np.int64), bases])
 
-                output_neuron_idx = output_neuron_idx.astype(np.int64)
-                input_neuron_idx = input_neuron_idx.astype(np.int64)
+            def prop(i, s, e):
+                block_node_init_kward = population_node_init_kwards[i] if isinstance(population_node_init_kwards,
+                                                                                     list) else population_node_init_kwards
+                if 'sub_block_idx' not in block_node_init_kward:
+                    return generate_block_node_property(sub_block_idx=i, s=s, e=e, **block_node_init_kward)
+                else:
+                    return generate_block_node_property(s=s, e=e, **block_node_init_kward)
 
-                output_neuron_idx += bases[i].astype(output_neuron_idx.dtype)
-                input_neuron_idx += bases[i + input_block_idx].astype(input_neuron_idx.dtype)
-                yield output_neuron_idx, input_neuron_idx, input_neuron_offset, connect_weight
+            def conn(i, s, e):
+                prob = population_connect_prob[i, :]
+                step = int(1e6)
+                for _s in range(s, e, step):
+                    _e = min(_s + step, e)
+                    output_neuron_idx, input_block_idx, input_neuron_idx, input_neuron_offset, connect_weight = \
+                        connect_for_single_sparse_block(i, bases[i + 1] - bases[i],
+                                                        prob,
+                                                        s=_s,
+                                                        e=_e,
+                                                        extern_input_k_sizes=extern_input_k_sizes,
+                                                        degree=degree if not isinstance(degree, np.ndarray) else degree[
+                                                            i],
+                                                        init_min=init_min,
+                                                        init_max=init_max)
 
-        return prop, conn, bases
+                    output_neuron_idx = output_neuron_idx.astype(np.int64)
+                    input_neuron_idx = input_neuron_idx.astype(np.int64)
 
-    return _out
+                    output_neuron_idx += bases[i].astype(output_neuron_idx.dtype)
+                    input_neuron_idx += bases[i + input_block_idx].astype(input_neuron_idx.dtype)
+                    yield output_neuron_idx, input_neuron_idx, input_neuron_offset, connect_weight
+
+            return prop, conn, bases
+        return _out
+    else:
+        os.makedirs(prefix, exist_ok=True)
+        mpi = False
+        if mpi:
+            from mpi4py import MPI
+            comm = MPI.COMM_WORLD
+            rank = comm.Get_rank()
+            size = comm.Get_size()
+            chunk = int(N // 100)   # brain_region version: 1
+            for i in range(rank, 100, size):
+                s, e = chunk * i, chunk * (i + 1) if i < 99 else N
+                with pool(initializer=_init, initargs=(population_connect_prob,
+                                                       population_node_init_kwards,
+                                                       extern_input_k_sizes,
+                                                       degree,
+                                                       init_min,
+                                                       init_max,
+                                                       prefix,
+                                                       )) as p:
+                    p.map(_process_dti, range(s, e, 1), chunksize=1)
+        else:
+            with pool(initializer=_init, initargs=(population_connect_prob,
+                                                       population_node_init_kwards,
+                                                       extern_input_k_sizes,
+                                                       degree,
+                                                       init_min,
+                                                       init_max,
+                                                       prefix,)) as p:
+                p.map(_process_dti, range(0, N, 1), chunksize=1)
+        print('total done!')
+        return
 
 
 def connect_for_single_sparse_block(population_idx, k, extern_input_rate, extern_input_k_sizes, degree=int(1e3),
@@ -349,7 +385,7 @@ def generate_block_node_property(size=1000,
 
     """
 
-    assert 0 <= s <= e < size
+    assert 0 <= s <= e <= size
 
     property = np.zeros([e - s, 22], dtype=np.float32)
     property[:, 0] = noise_rate
@@ -378,6 +414,52 @@ def generate_block_node_property(size=1000,
 
     return property
 
+
+def _process_dti(i):
+    global population_connect_prob
+    global population_node_init_kwards
+    global extern_input_k_sizes
+    global degree
+    global init_min
+    global init_max
+    global prefix
+
+
+    def check_if_exist():
+        os.makedirs(prefix, exist_ok=True)
+        if not os.path.exists(os.path.join(prefix, "block_{}.npz".format(i))):
+            return False
+        return True
+
+    if check_if_exist():
+        print("skip", i)
+        return
+    print("processing", i)
+    prob = population_connect_prob[i]
+    if isinstance(population_node_init_kwards, list):
+        population_node_init_kward = population_node_init_kwards[i]
+    else:
+        population_node_init_kward = population_node_init_kwards
+    assert isinstance(population_node_init_kward, dict)
+    property = generate_block_node_property(sub_block_idx=i, **population_node_init_kward)
+    output_neuron_idx, input_block_idx, input_neuron_idx, input_channel_offset, weight \
+        = connect_for_single_sparse_block(i, population_node_init_kward['size'],
+                                             prob,
+                                             extern_input_k_sizes=extern_input_k_sizes,
+                                             degree=degree if not isinstance(degree, np.ndarray) else degree[i],
+                                             init_min=init_min,
+                                             init_max=init_max,)
+
+    os.makedirs(prefix, exist_ok=True)
+    np.savez(os.path.join(prefix, "block_{}".format(i)),
+             property=np.ascontiguousarray(property),
+             output_neuron_idx=np.ascontiguousarray(output_neuron_idx),
+             input_block_idx=np.ascontiguousarray(input_block_idx),
+             input_neuron_idx=np.ascontiguousarray(input_neuron_idx),
+             input_channel_offset=np.ascontiguousarray(input_channel_offset),
+             weight=np.ascontiguousarray(weight))
+
+    print("done in population! ", i)
 
 def merge_dti_distributation_block(orig_path, new_path, dtype="single", number=1, block_partition=None,
                                    debug_block_dir=None, output_direction=False, MPI_rank=None, only_load=False):
@@ -548,6 +630,33 @@ def merge_dti_distributation_block(orig_path, new_path, dtype="single", number=1
         assert 0 <= MPI_rank and MPI_rank < block_numbers.shape[0]
         _process(MPI_rank)
     return block_threshold
+
+
+
+def _init(_population_connect_prob,
+          _population_node_init_kwards,
+          _extern_input_k_sizes,
+          _degree,
+          _init_min,
+          _init_max,
+          _prefix,):
+    global population_connect_prob
+    global population_node_init_kwards
+    global extern_input_k_sizes
+    global degree
+    global init_min
+    global init_max
+    global prefix
+
+    population_connect_prob = _population_connect_prob
+    population_node_init_kwards = _population_node_init_kwards
+    extern_input_k_sizes = _extern_input_k_sizes
+    degree = _degree
+    init_min = _init_min
+    init_max = _init_max
+    prefix = _prefix
+
+    np.random.seed()
 
 
 def get_block_threshold(number, dti_block_thresh):

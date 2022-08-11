@@ -37,7 +37,7 @@ class BOLD:
         self.s = w[:, :, 0].reshape(-1)
         self.q = torch.max(w[:, :, 1], torch.tensor([1e-05]).type_as(w)).reshape(-1)
         self.v = torch.max(w[:, :, 2], torch.Tensor([1e-05]).type_as(w)).reshape(-1)
-        self.f_in = torch.min(torch.max(w[:, :, 3], torch.Tensor([-15]).type_as(w)), torch.Tensor([10]).type_as(w)).reshape(-1)
+        # self.f_in = torch.min(torch.max(w[:, :, 3], torch.Tensor([-15]).type_as(w)), torch.Tensor([10]).type_as(w)).reshape(-1)
         self.f_in = torch.max(w[:, :, 3], torch.Tensor([-15]).type_as(w)).reshape(-1)  # usualy setting in zhangwenyong code
 
     def run(self, u):

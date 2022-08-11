@@ -191,7 +191,7 @@ class simulation(object):
         beta = torch.ones(self.total_populations, device="cuda:0") * beta
         self.block_model.gamma_property_by_subblk(population_info, alpha, beta, debug=False)
 
-    def evolve(self, step, vmean_option=False, sample_option=True) -> tuple:
+    def evolve(self, step, vmean_option=False, sample_option=True, bold_detail=False) -> tuple:
         """
 
         The block evolve one TR time, i.e, 800 ms as default setting.
@@ -248,7 +248,10 @@ class simulation(object):
             temp_spike = torch.stack([x[2] for x in total_res], dim=0)
             temp_spike &= (torch.abs(temp_vsamle - v_th) / 50 < 1e-5)
             out += (temp_spike, temp_vsamle, )
-        out += (bold_out)
+        if not bold_detail:
+            out += (bold_out, )
+        else:
+            out += (self.bold.s, self.bold.q, self.bold.v, self.bold.f_in, bold_out, )
         return out
 
     def run(self, step=800, observation_time=100, hp_index=None, hp_total=None):
