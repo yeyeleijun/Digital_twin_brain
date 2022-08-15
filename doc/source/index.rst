@@ -6,14 +6,19 @@
 Welcome to DTB's documentation!
 ===============================
 
-We simulate the human brain at the scale up to ``86 billion`` neurons using the current available computer power,
-and at the same time the simulated brain: ``digital twin brain (DTB)``, mimics certain aspects of its
-biological counterpart both at resting state and in action.
+**DTB** is a super large scale neuromorphic simulation platform.
+DTB is a parallel and distributed system, which deploy ``large-scale neuronal networks`` on 10,000 GPU cards,which operates and communicates information in real time.
+By optimizing the neuron layout and routing communication of cards,
+we realize the 1:1 human brain simulation with a deceleration ratio of 560.
+In order to model a biological-plausible brain, we develop a ``hierarchal mesoscale data assimilation (HMDA)`` method to estimate 10 trillion parameters in DTB,
+which succeeds to reconstruct a cognitive brain.
+
+.. image:: fig/DTB.png
+  :width: 800
 
 .. toctree::
    :maxdepth: 2
-   :numbered:
-   :caption: Documentation:
+   :hidden:
 
    rstfiles/install
    rstfiles/user_guide

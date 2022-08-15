@@ -24,15 +24,18 @@ release = '1.0'
 extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.intersphinx',
               'sphinx.ext.viewcode',
-              'sphinx.ext.napoleon']
+              'sphinx.ext.napoleon',
+              'sphinx.ext.mathjax']
 
 templates_path = ['_templates']
-exclude_patterns = ['cuda', 'default_param.py']
+exclude_patterns = ['cuda', 'default_params.py']
 
 source_parsers = {
     '.md': CommonMarkParser,
 }
 source_suffix = ['.rst', '.md']
+
+autodoc_mock_imports = ['torch', 'cuda', 'numba', 'prettytable']
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

@@ -265,12 +265,12 @@ def connect_for_single_sparse_block(population_idx, k, extern_input_rate, extern
             degree_max = (_extern_input_k_sizes[extern_input_idx] / extern_input_rate.data).astype(
                 np.int64)
             degree_max = np.min(degree_max)
-            assert degree_max <= degree
+            assert degree_max >= degree
 
             # trick
             # if degree_max <= degree + 100:
+            #     degree = degree - 5
             #     print(f"Evoke| change degree from {degree} to {degree_max}")
-            #     degree = min(degree_max, degree)
             extern_input_rate = np.add.accumulate(extern_input_rate.data)
 
         print("length:", e - s, "degree:", degree)

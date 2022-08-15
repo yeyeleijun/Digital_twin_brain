@@ -7,7 +7,7 @@ import torch
 import os
 from generation.read_block import connect_for_block
 from models.block import block
-from make_block import connect_for_multi_sparse_block
+from generation.make_block import connect_for_multi_sparse_block
 
 
 def initilalize_gui_in_homo_block(delta_t=1, default_Hz=20, max_output_Hz=100, T_ref=5, degree=100, g_Li=0.03,

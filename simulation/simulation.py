@@ -8,8 +8,8 @@ import os
 import time
 import numpy as np
 import torch
-from default_param import bold_params, v_th
-# from cuda.python.dist_blockwrapper_pytorch import BlockWrapper as block
+from default_params import bold_params, v_th
+from cuda.python.dist_blockwrapper_pytorch import BlockWrapper as block
 from models.bold_model_pytorch import BOLD
 from utils.pretty_print import pretty_print, table_print
 from utils.helpers import load_if_exist, torch_2_numpy
