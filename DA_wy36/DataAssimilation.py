@@ -62,7 +62,36 @@ def diffusion_EnKF(w_hat, bold_sigma, bold_t, solo_rate, debug=False):
 
 
 class DataAssimilation(simulation):
+    """
+    This is for micro-column version or voxel version.
+
+    Specifically, for micro-column version, the overlap=10 and voxel version 1.
+    It means that in DA procedure, the step units in indexing the populations between ensembles.
+
+    """
     def __init__(self, block_path: str, ip: str, route_path: str, column: bool, **kwargs):
+        """
+        By giving the iP and block path, a DataAssimilation object is initialized.
+        Usually in the case: 100 ensemble, i.e., 100 simulation ensemble.
+
+        Parameters
+        ----------
+
+        block_path: str
+            the dir which saves the block.npz
+
+        ip: str
+            the server listening address
+
+        route_path : str, default is None
+            the routing results.
+
+        column: bool, default is False
+            For micro-column version if column is true else for voxel
+
+        kwargs: other positional params which are specified.
+
+        """
         super().__init__(self, block_path, ip, route_path, column, **kwargs)
         self._ensemble_number = kwargs.get("ensemble", 100)
         self._hp_sigma = kwargs.get("hp_sigma", 1.)
@@ -178,7 +207,7 @@ class DataAssimilation(simulation):
     def single_block_neurons_number(self):
         return self._single_block_neurons_number
 
-    def hp_random_initialize(self, gui_low, gui_high, gui_number, voxel_index=None):
+    def hp_random_initialize(self, gui_low, gui_high, voxel_index=None):
         """
         Generate initial hyper parameters of each ensemble brain samples
 
@@ -193,9 +222,6 @@ class DataAssimilation(simulation):
         gui_high: torch.tensor, shape=(single_voxel_number, gui_number)
             low bound of hyper-parameters
 
-        gui_number: int
-            the number of hyper-parameters assimilated in brain property
-
         voxel_index: torch.tensor int64, shape=(-1)
             index of voxel assimilated or updated
 
@@ -205,14 +231,15 @@ class DataAssimilation(simulation):
         self._hp: torch.tensor float32 shape=(ensemble_number*single_voxel_number*gui_number)
 
         """
-        voxel_index = self.single_voxel_number if voxel_index is None else voxel_index
-        assert gui_low.shape[0] == len(voxel_index)
+        self._hp_index_in_voxel = self.single_voxel_number if voxel_index is None else voxel_index
+        assert gui_low.shape[0] == len(self._hp_index_in_voxel)
+        self._hp_num = gui_low.shape[1]
         self._hp_low = gui_low.reshape(-1)
         self._hp_high = gui_high.reshape(-1)
-        self._hp_num = gui_number
-        self._hp_log = torch.linspace(-20, 20, self.ensemble_number).repeat(voxel_index * gui_number, 1)
-        self._hp_log = self._hp_log.T.reshape(self.ensemble_number, voxel_index, gui_number)
-        for i in range(gui_number):
+        self._hp_log = torch.linspace(-20, 20, self.ensemble_number).repeat(
+            len(self._hp_index_in_voxel) * self._hp_num, 1)
+        self._hp_log = self._hp_log.T.reshape(self.ensemble_number, len(self._hp_index_in_voxel), self._hp_num)
+        for i in range(self._hp_num):
             idx = np.random.choice(self.ensemble_number, self.ensemble_number, replace=False)
             self._hp_log[:, :, i] = self._hp_log[idx, :, i]
         self._hp = self.sigmoid_torch(self._hp_log.reshape(self.ensemble_number, -1), self._hp_low, self._hp_high)
@@ -341,13 +368,13 @@ class DataAssimilation(simulation):
                 np.save(os.path.join(write_path, "w.npy"), w_save)
                 np.save(os.path.join(write_path, "w_fix.npy"), w_fix)
             print("------------run da" + str(t) + ":" + str(time.time() - start_time))
-        bold_assimilation = torch.stack(w_save)[:, :, :, -1]
+        bold_assimilation = torch2numpy(torch.stack(w_save)[:, :, :, -1])
         np.save(os.path.join(write_path, "bold_assimilation.npy"), bold_assimilation)
         self.plot_bold(write_path, bold_real, bold_assimilation, np.arange(10))
         hp_save_log = torch.stack(w_save)[:, :, :, :self._hp_num]
-        hp_sm = self.sigmoid_torch(hp_save_log, self._hp_low, self._hp_high)
+        hp_sm = torch2numpy(self.sigmoid_torch(hp_save_log, self._hp_low, self._hp_high))
         np.save(os.path.join(write_path, "hp_sm.npy"), hp_sm.mean(1))
         self.plot_hp(write_path, None, hp_sm, np.arange(10), self._hp_num, 'hp_sm')
-        hp_ms = self.sigmoid_torch(hp_save_log.mean(1), self._hp_low, self._hp_high)
+        hp_ms = torch2numpy(self.sigmoid_torch(hp_save_log.mean(1), self._hp_low, self._hp_high))
         np.save(os.path.join(write_path, "hp_ms.npy"), hp_ms)
         self.plot_hp(write_path, None, np.expand_dims(hp_ms, 1), np.arange(10), self._hp_num, 'hp_ms')
