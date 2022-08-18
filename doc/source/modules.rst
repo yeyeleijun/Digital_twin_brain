@@ -2,7 +2,7 @@ Python API
 ==================
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 2
 
    rstfiles/models
    rstfiles/generation

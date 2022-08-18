@@ -35,8 +35,7 @@ source_parsers = {
 }
 source_suffix = ['.rst', '.md']
 
-autodoc_mock_imports = ['torch', 'cuda', 'numba', 'prettytable', 'h5py']
-
+autodoc_mock_imports = ['torch', 'cuda', 'numba', 'prettytable', 'h5py', 'seaborn', 'matplotlib', 'pandas', 'scikit-learn', 'sparse', 'scipy']
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 

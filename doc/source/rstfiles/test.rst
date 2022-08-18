@@ -5,7 +5,6 @@ test
 test\_generation
 -------------------
 
-.. automodule:: test.test_generation
+.. autoclass:: test.test_generation.TestBlock
    :members:
-   :undoc-members:
    :show-inheritance:

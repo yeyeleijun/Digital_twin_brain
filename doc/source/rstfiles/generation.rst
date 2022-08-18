@@ -1,13 +1,13 @@
 generation
 ==========
 
+The generation, reading, processing of connection table. It's mainly accelerated by multiprocessing and numba.
 
 initialzie\_params
 -------------------
 
 .. automodule:: generation.initialzie_params
    :members:
-   :undoc-members:
    :show-inheritance:
 
 make\_block
@@ -15,7 +15,6 @@ make\_block
 
 .. automodule:: generation.make_block
    :members:
-   :undoc-members:
    :show-inheritance:
 
 read\_block

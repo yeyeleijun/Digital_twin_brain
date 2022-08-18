@@ -1,7 +1,1 @@
 numpy
-scipy
-sparse
-pandas
-matplotlib
-scikit-learn
-seaborn

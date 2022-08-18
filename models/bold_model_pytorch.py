@@ -41,6 +41,20 @@ class BOLD:
         self.f_in = torch.max(w[:, :, 3], torch.Tensor([-15]).type_as(w)).reshape(-1)  # usualy setting in zhangwenyong code
 
     def run(self, u):
+        """
+        the main method in this class to evolve this balloon model.
+
+        Parameters
+        ----------
+        u : ndarray
+            spike activity.
+
+        Returns
+        -------
+        bold: ndarray
+            the shape is the same as input.
+
+        """
         if isinstance(u, np.ndarray):
             u = torch.from_numpy(u.astype(np.float)).cuda()
         if self.s is None:

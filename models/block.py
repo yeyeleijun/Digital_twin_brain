@@ -114,6 +114,22 @@ class block:
         self.t_ik_last = torch.where(active, self.t, self.t_ik_last)
 
     def run(self, noise_rate=0.01, isolated=False):
+        """
+        the main method in this class to evolve this spike neuronal network.
+        Each neuron in the network is driven by an independent background synaptic noise to maintain
+        network activity. Specifically, the background synaptic noise are modelled as uncorrelated Poisson-type spike trains.
+        For the generation of background noise, we implement it by replacing the poission train as a simple random train.
+
+        Parameters
+        ----------
+        noise_rate: float
+            the frequency of background noise.
+        isolated: bool
+            whether to cut off the synaptic communication in this network, but retain the background noise.
+        Returns
+        -------
+
+        """
         self.t += self.delta_t
         self.active = self.update_Vi(self.delta_t)
         if not isolated:

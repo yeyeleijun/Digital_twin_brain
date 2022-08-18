@@ -129,7 +129,7 @@ def specified_sample(aal_region, neurons_per_population_base, specified_info=Non
     """
     more convenient version to sample neurons for ``simulation`` object.
 
-    neurons_per_population_base is read from population_base.npy which is generated during generation of connection table.
+    neurons_per_population_base is read from :class:`population_base.npy <.TestBlock>` which is generated during generation of connection table.
 
 
     Parameters

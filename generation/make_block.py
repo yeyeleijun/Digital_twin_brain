@@ -351,15 +351,33 @@ def generate_block_node_property(size=1000,
     sub_block_idx: bool
         This is a comparison neurons used to mark those who are used to do accurate verification.
 
-    C: flat
+    C: float
+        capacitance
+
     T_ref: float
+        refractory time
+
     g_Li: float
+        conductance of leaky channel
+
     V_L: float
+        leaky potential
+
     V_th: float
+        threshold potential
+
     V_reset: float
+        reset potential
+
     g_ui: tuple[float, ]
+        conductance of 4 synaptic channels
+
     V_ui: tuple[float, ]
+        reverse potential of 4 synaptic channels
+
     tao_ui: tuple[float, ]
+        timescale of exponential synaptic filter.
+
     s: int
         start index
     e: int
@@ -602,23 +620,22 @@ def merge_dti_distributation_block(orig_path, new_path, dtype="single", number=1
         _input_channel_offset = np.take(_input_channel_offset, new_weight_idx, axis=0)
         print("done", block_i)
 
-        for d in dtype:
-            _new_path = os.path.join(new_path, d)
-            os.makedirs(_new_path, exist_ok=True)
-            if d == "single":
-                _value = _value
-            elif d == "half":
-                _value = _value.astype(np.float16)
-            else:
-                raise ValueError
-            storage_path = os.path.join(_new_path, "block_{}".format(block_i))
-            np.savez(storage_path,
-                     property=_property,
-                     output_neuron_idx=_output_neuron_idx,
-                     input_block_idx=_input_block_idx,
-                     input_neuron_idx=_input_neuron_idx,
-                     input_channel_offset=_input_channel_offset,
-                     weight=_value)
+        _new_path = os.path.join(new_path, dtype)
+        os.makedirs(_new_path, exist_ok=True)
+        # if dtype == "single":
+        #     _value = _value
+        # elif dtype == "half":
+        #     _value = _value.astype(np.float16)
+        # else:
+        #     raise ValueError
+        storage_path = os.path.join(_new_path, "block_{}".format(block_i))
+        np.savez(storage_path,
+                 property=_property,
+                 output_neuron_idx=_output_neuron_idx,
+                 input_block_idx=_input_block_idx,
+                 input_neuron_idx=_input_neuron_idx,
+                 input_channel_offset=_input_channel_offset,
+                 weight=_value)
 
     block_numbers = block_threshold[1:] - block_threshold[:-1]
     assert (block_numbers > 0).all()
@@ -687,7 +704,9 @@ def turn_to_block_idx(idx, block_threshold, turn_format=False):
 
 def add_debug(debug_block_dir, prop, conn, _dti_block_thresh, debug_idx_path, only_load):
     """
-    add debug block to verify the accuracy of simulation with cuda program.
+    Add debug block to verify the accuracy of simulation with cuda program.
+    Parameters.
+
     Parameters
     ----------
     debug_block_dir: str
