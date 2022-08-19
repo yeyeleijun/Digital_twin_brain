@@ -15,8 +15,8 @@ from utils.helpers import np_move_avg
 def draw(log_path, freqs, block_size, sample_idx, write_path, name_path, bold_path, real_bold_path, vmean_path,
          vsample):
     """
-    Draw some valid figures for returned info from block simulation.
-    More detail ref to source code.
+    Draw some valid figures for returned info from :ref:`block simulation <simulation>`
+    and more detail ref to source code.
 
     """
     log = np.load(log_path)
