@@ -63,10 +63,11 @@ def rest_demo(args):
     gui_number = len(property_index)
     gui_low = gui_real[property_index - 10] / hp_range_rate[0]  # shape = gui_number
     gui_high = gui_real[property_index - 10] * hp_range_rate[1]
-    gui_low = torch.tensor(gui_low, dtype=torch.float32).reshape(1, gui_number).repeat(da_rest.single_voxel_number, 1)
-    gui_high = torch.tensor(gui_high, dtype=torch.float32).reshape(1, gui_number).repeat(da_rest.single_voxel_number, 1)
+    gui_low = torch.tensor(gui_low, dtype=torch.float32).reshape(1, gui_number)
+    gui_high = torch.tensor(gui_high, dtype=torch.float32).reshape(1, gui_number)
     # da_rest initialize
-    gui = da_rest.hp_random_initialize(gui_low, gui_high, gui_number)
+    gui = da_rest.hp_random_initialize(gui_low, gui_high, gui_pblk=True)
+    da_rest.hp_index2hidden_state(path_cortical_or_not)
     da_rest.da_property_initialize(property_index, args.gui_alpha, gui)
     da_rest.get_hidden_state(steps=1e3)
     # da_rest run
