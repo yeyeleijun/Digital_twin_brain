@@ -155,7 +155,7 @@ class simulation(object):
 
         sample_idx = load_if_exist(specified_sample, os.path.join(self.write_path, "sample_idx"),
                                    aal_region=aal_region,
-                                   neurons_per_population_base=population_base,specified_info=specified_info)
+                                   neurons_per_population_base=population_base, specified_info=specified_info)
         sample_idx = torch.from_numpy(sample_idx).cuda()[:, 0]
         num_sample = sample_idx.shape[0]
         assert sample_idx[:, 0].max() < self.total_neurons
@@ -165,6 +165,9 @@ class simulation(object):
         self.num_sample = num_sample
 
         return num_sample
+
+    def mul_property_by_subblk(self, index, value):
+        self.block_model.mul_property_by_subblk(index, value)
 
     def gamma_initialize(self, param_index, alpha=5., beta=5.):
         """
@@ -251,7 +254,7 @@ class simulation(object):
         if not bold_detail:
             out += (bold_out, )
         else:
-            out += (self.bold.s, self.bold.q, self.bold.v, self.bold.f_in, bold_out, )
+            out = (out[0][-1], self.bold.s, self.bold.q, self.bold.v, self.bold.f_in, bold_out, )
         return out
 
     def run(self, step=800, observation_time=100, hp_index=None, hp_total=None):
@@ -346,7 +349,7 @@ class simulation(object):
 
         """
 
-        info = {'name': self.name, "num_neurons": self.total_neurons, 'num_voxel':self.num_voxel,
+        info = {'name': self.name, "num_neurons": self.total_neurons, 'num_voxel': self.num_voxel,
                 'num_populations': self.total_populations}
         table_print(info)
         if hp_path is not None:
