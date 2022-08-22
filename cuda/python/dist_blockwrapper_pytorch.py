@@ -269,7 +269,7 @@ class BlockWrapper:
                 _run_time += time.time() - time1
 
             if len(processed_out) == 1:
-                yield processed_out[0][j, :]
+                yield (processed_out[0][j, :],)
             else:
                 yield tuple(o[j, :] for o in processed_out)
 

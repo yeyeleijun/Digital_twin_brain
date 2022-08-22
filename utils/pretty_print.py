@@ -34,7 +34,7 @@ def pretty_print(content: str):
     print()
 
 
-def table_print(content: dict, n_rows=None, n_columns=None):
+def table_print(content: dict, n_rows=None):
     """
     display something inside a table.
 
@@ -49,13 +49,12 @@ def table_print(content: dict, n_rows=None, n_columns=None):
 
     """
     assert isinstance(content, dict)
-    if n_rows * n_columns < len(content):
-        n_columns = 2
-        n_rows = (len(content) + n_columns - 1) // n_columns
+    if n_rows is None or n_rows < len(content):
+        n_rows = len(content)
     tb = pt.PrettyTable()
     content_list = [list(x) for x in content.items()]
     content_list = sum(content_list, [])
-    tb.field_names = ["name", "value"] * n_columns
+    tb.field_names = ["name", "value"]
     for i in range(n_rows):
-        tb.add_row(content_list[n_columns * 2 * i:n_columns * 2 * (i+1)])
+        tb.add_row(content_list[2 * i: 2 * (i+1)])
     print(tb)

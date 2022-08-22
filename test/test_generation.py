@@ -4,7 +4,6 @@
 # @File : test_generation.py
 
 
-
 import unittest
 import h5py
 # from mpi4py import MPI
@@ -234,6 +233,19 @@ class TestBlock(unittest.TestCase):
             out_conn_prob = out_conn_prob / out_conn_prob.sum(axis=1, keepdims=True)
         return out_conn_prob, out_gm, out_degree_scale
 
+    def _test_make_small_block(self, write_path, initial_parameter=(0.00495148, 0.0009899, 0.08417509, 0.00458287)):
+        prob = torch.tensor([[0.8, 0.2], [0.2, 0.8]])
+        tau_ui = (2, 40, 10, 50)
+        population_kwards = [{'g_Li': 0.03,
+                              'g_ui': initial_parameter,
+                              'T_ref': 5,
+                              "V_reset": -65,
+                              'tao_ui': tau_ui,
+                              'size': num} for num in [1600, 400]]
+        connect_for_multi_sparse_block(prob, population_kwards, degree=100, init_min=0,
+                                       init_max=1, prefix=write_path)
+        print("Done")
+
     def test_make_whole_brain_include_cortical_laminar_and_subcortical_voxel_model(self,
                                                                                    path="./laminar_structure_whole_brain_include_subcortical/200m_structure_d100",
                                                                                    degree=100,
@@ -299,11 +311,11 @@ class TestBlock(unittest.TestCase):
                    }
                   for i, b in enumerate(block_size)]
 
-        population_base = np.array([kword['size'] for kword in kwords], dtype=np.uin8)
+        population_base = np.array([kword['size'] for kword in kwords], dtype=np.uint8)
         population_base = np.add.accumulate(population_base)
         population_base = np.insert(population_base, 0, 0)
-        os.makedirs(os.path.join(path, 'single'), exist_ok=True)
-        np.save(os.path.join(path, 'single', "population_base.npy"), population_base)
+        os.makedirs(os.path.join(path, 'supplementary_info'), exist_ok=True)
+        np.save(os.path.join(path, 'supplementary_info', "population_base.npy"), population_base)
 
         conn = connect_for_multi_sparse_block(conn_prob, kwords,
                                               degree=degree,
@@ -325,6 +337,9 @@ class TestBlock(unittest.TestCase):
                                                 scale=int(1e8)):
         blocks = int(scale / 5e6)
         print(f"merge to {blocks} blocks")
+        # TODO: Requirements: 1. (xiechao) sort out the data format, such as DTI, T1_ weight
+        # TODO: 2. (xiechao) Add a list to indicate the category of all voxels (cortical or subcortical)
+        # TODO: 3. (leopold) read the category and save as npy file in 'data_dir/supplementary_info/'
         file = h5py.File(
             '/public/home/ssct004t/project/yeleijun/spiking_nn_for_brain_simulation/data/jianfeng_normal/A1_1_DTI_voxel_structure_data_jianfeng.mat',
             'r')
@@ -342,7 +357,8 @@ class TestBlock(unittest.TestCase):
         conn_prob[np.diag_indices_from(dti)] = 0
         # conn_prob[np.diag_indices_from(dti)] = conn_prob.sum(axis=1) * 5 / 3  # intra_E:inter_E:I=5:3:2
         conn_prob /= conn_prob.sum(axis=1, keepdims=True)
-        conn_prob, block_size, degree_scale = self._add_laminar_cortex_model(conn_prob, block_size, canonical_voxel=True)
+        conn_prob, block_size, degree_scale = self._add_laminar_cortex_model(conn_prob, block_size,
+                                                                             canonical_voxel=True)
 
         gui = np.array([(0.0200, 0.0010, 0.0851, 0.0063)], dtype=np.float64)
         degree = np.maximum((degree * degree_scale).astype(np.uint16), 1)
@@ -358,8 +374,8 @@ class TestBlock(unittest.TestCase):
         population_base = np.array([kword['size'] for kword in kwords], dtype=np.uin8)
         population_base = np.add.accumulate(population_base)
         population_base = np.insert(population_base, 0, 0)
-        os.makedirs(os.path.join(path, 'single'), exist_ok=True)
-        np.save(os.path.join(path, 'single', "population_base.npy"), population_base)
+        os.makedirs(os.path.join(path, 'supplementary_info'), exist_ok=True)
+        np.save(os.path.join(path, 'supplementary_info', "population_base.npy"), population_base)
 
         conn = connect_for_multi_sparse_block(conn_prob, kwords,
                                               degree=degree,
@@ -375,7 +391,6 @@ class TestBlock(unittest.TestCase):
                                            number=blocks,
                                            dtype="single",
                                            debug_block_dir=None)
-
 
     def _test_generate_EI_big_network(self, path="./canonical_ei_big_network", degree=100,
                                       minmum_neurons_for_block=1000,

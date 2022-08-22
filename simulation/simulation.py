@@ -36,7 +36,7 @@ class simulation(object):
     ip: str
         the server listening address
 
-    route_path : str, default is None
+    route_path : str or None, default is None
         the routing results.
 
     kwargs: other positional params which are specified.
@@ -84,9 +84,9 @@ class simulation(object):
         self.populations_cpu = self.populations.cpu().numpy()
 
         if column:
-            self.num_voxel = int(self.populations_cpu.max() + 9 // 10)
+            self.num_voxel = int((self.populations_cpu.max() + 9) // 10)
         else:
-            self.num_voxel = int(self.populations_cpu.max() + 1 // 2)
+            self.num_voxel = int((self.populations_cpu.max() + 1) // 2)
 
         self.neurons_per_population = self.block_model.neurons_per_subblk
         neurons_per_population = self.neurons_per_population.cpu().numpy()
@@ -97,6 +97,7 @@ class simulation(object):
         self.total_neurons = int(self.block_model.total_neurons)
 
         self.write_path = kwargs.get('write_path', "./")
+        os.makedirs(self.write_path, exist_ok=True)
         self.name = kwargs.get('name', "simulation")
         self.print_info = kwargs.get("print_info", False)
         self.vmean_option = kwargs.get("vmean_option", False)
@@ -113,7 +114,7 @@ class simulation(object):
         self.vmean_option = False
         self.print_info = False
 
-    def update(self, param_index, param):
+    def update(self, hp_index, param):
         """
         Use a distribution of gamma(alpha, beta) to update neuronal params,
         where alpha = hpyer_param * 1e8, beta = 1e8.
@@ -123,15 +124,15 @@ class simulation(object):
 
         Parameters
         ----------
-        param_index: int
+        hp_index: int
             indicate the column index among 21 attributes of LIF neuron.
 
         param: float
 
         """
-        print(f"update {param_index}th attribute, to value {param:.3f}\n")
+        print(f"update {hp_index}th attribute, to value {param:.3f}\n")
         population_info = torch.stack(
-            torch.meshgrid(self.populations, torch.tensor([param_index], dtype=torch.int64, device="cuda:0")),
+            torch.meshgrid(self.populations, torch.tensor([hp_index], dtype=torch.int64, device="cuda:0")),
             dim=-1).reshape((-1, 2))
         alpha = torch.ones(self.total_populations, device="cuda:0") * param * 1e8
         beta = torch.ones(self.total_populations, device="cuda:0") * 1e8
@@ -158,7 +159,7 @@ class simulation(object):
                                    neurons_per_population_base=population_base, specified_info=specified_info)
         sample_idx = torch.from_numpy(sample_idx).cuda()[:, 0]
         num_sample = sample_idx.shape[0]
-        assert sample_idx[:, 0].max() < self.total_neurons
+        assert sample_idx.max() < self.total_neurons
         self.block_model.set_samples(sample_idx)
         load_if_exist(lambda: self.block_model.neurons_per_subblk.cpu().numpy(),
                       os.path.join(self.write_path, "blk_size"))
@@ -167,9 +168,23 @@ class simulation(object):
         return num_sample
 
     def mul_property_by_subblk(self, index, value):
+        """
+        In DA process, we use it to update parameters which are sampled from a distribution.
+        Parameters
+        ----------
+        index: Tensor
+            the index of neuronal attribute which is specified to update, shape=(n, 2).
+        value: Tensor
+            the value of hyperparamter corresponding to above attribute.
+        Returns
+        -------
+
+        """
+        assert isinstance(index, torch.Tensor)
+        assert isinstance(value, torch.Tensor)
         self.block_model.mul_property_by_subblk(index, value)
 
-    def gamma_initialize(self, param_index, alpha=5., beta=5.):
+    def gamma_initialize(self, hp_index, alpha=5., beta=5.):
         """
         Use a distribution of gamma(alpha, beta) to update neuronal params,
         where alpha = beta = 5.
@@ -177,7 +192,7 @@ class simulation(object):
         Parameters
         ----------
 
-        param_index: list
+        hp_index: list
             indicate the column index among 21 attributes of LIF neuron.
 
         alpha: float, default=5.
@@ -186,9 +201,9 @@ class simulation(object):
 
         """
 
-        print(f"gamma_initialize {param_index}th attribute, to value gamma({alpha}, {beta}) distribution\n")
+        print(f"gamma_initialize {hp_index}th attribute, to value gamma({alpha}, {beta}) distribution\n")
         population_info = torch.stack(
-            torch.meshgrid(self.populations, torch.tensor(param_index, dtype=torch.int64, device="cuda:0")),
+            torch.meshgrid(self.populations, torch.tensor(hp_index, dtype=torch.int64, device="cuda:0")),
             dim=-1).reshape((-1, 2))
         alpha = torch.ones(self.total_populations, device="cuda:0") * alpha
         beta = torch.ones(self.total_populations, device="cuda:0") * beta
@@ -277,7 +292,7 @@ class simulation(object):
         start_time = time.time()
         if hp_total is not None:
             self.gamma_initialize(hp_index)
-            population_info = torch.stack(torch.meshgrid(self.populations, hp_total), dim=-1).reshape((-1, 2))
+            population_info = torch.stack(torch.meshgrid(self.populations, torch.tensor(hp_index, dtype=torch.int64, device="cuda:0")), dim=-1).reshape((-1, 2))
             self.block_model.mul_property_by_subblk(population_info, hp_total[0, :])
 
         hp_total = hp_total[1:, ]
@@ -356,7 +371,6 @@ class simulation(object):
             hp_total = np.load(hp_path)
             assert hp_total.shape[1] == self.total_populations
             hp_total = torch.from_numpy(hp_total.astype(np.float32)).cuda()
-            hp_index = torch.tensor(hp_index, dtype=torch.int64, device="cuda:0")
             self.run(step=800, observation_time=100, hp_index=hp_index, hp_total=hp_total)
         else:
             self.run(step=800, observation_time=100, hp_index=None, hp_total=None)
