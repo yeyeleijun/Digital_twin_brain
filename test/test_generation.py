@@ -6,7 +6,7 @@
 
 import unittest
 import h5py
-# from mpi4py import MPI
+from mpi4py import MPI
 import numpy as np
 
 from generation.make_block import *
@@ -36,8 +36,8 @@ class TestBlock(unittest.TestCase):
                                22.1 * 83, 22.1 * 17], dtype=np.float64)  # ignore the L1 neurons
         else:
             # 4:1 setting
-            lcm_connect_prob = np.array([[0.3, 0.2, 0.5],
-                                         [0.3, 0.2, 0.5]], dtype=np.float64)
+            lcm_connect_prob = np.array([[4/7, 1/7, 2/7],
+                                         [4/7, 1/7, 2/7]], dtype=np.float64)
             lcm_gm = np.array([0.8, 0.2], dtype=np.float64)
 
         lcm_gm /= lcm_gm.sum()
@@ -246,7 +246,7 @@ class TestBlock(unittest.TestCase):
                                        init_max=1, prefix=write_path)
         print("Done")
 
-    def test_make_whole_brain_include_cortical_laminar_and_subcortical_voxel_model(self,
+    def _test_make_whole_brain_include_cortical_laminar_and_subcortical_voxel_model(self,
                                                                                    path="./laminar_structure_whole_brain_include_subcortical/200m_structure_d100",
                                                                                    degree=100,
                                                                                    minmum_neurons_for_block=0,
@@ -332,8 +332,8 @@ class TestBlock(unittest.TestCase):
                                            dtype="single",
                                            debug_block_dir=None)
 
-    def _test_generate_normal_voxel_whole_brain(self, path="./normal_voxel_whole_brian", degree=100,
-                                                minmum_neurons_for_block=1000,
+    def test_generate_normal_voxel_whole_brain(self, path="./data/jianfeng_normal", degree=100,
+                                                minimum_neurons_for_block=(200, 50),
                                                 scale=int(1e8)):
         blocks = int(scale / 5e6)
         print(f"merge to {blocks} blocks")
@@ -360,7 +360,7 @@ class TestBlock(unittest.TestCase):
         conn_prob, block_size, degree_scale = self._add_laminar_cortex_model(conn_prob, block_size,
                                                                              canonical_voxel=True)
 
-        gui = np.array([(0.0200, 0.0010, 0.0851, 0.0063)], dtype=np.float64)
+        gui = np.array([0.01935443, 0.00052911, 0.09493671, 0.02250352], dtype=np.float64)  # find in sub critical in 3hz noise rate and 0.1ms iteration resolution.
         degree = np.maximum((degree * degree_scale).astype(np.uint16), 1)
 
         kwords = [{"V_th": -50,
@@ -368,10 +368,11 @@ class TestBlock(unittest.TestCase):
                    'g_Li': 0.03,
                    'g_ui': gui,
                    'tao_ui': (2, 40, 10, 50),
-                   "size": int(max(b * scale, minmum_neurons_for_block))}
+                   'noise_rate': 0.0003,
+                   "size": int(max(b * scale, minimum_neurons_for_block[i % 2]))}
                   for i, b in enumerate(block_size)]
 
-        population_base = np.array([kword['size'] for kword in kwords], dtype=np.uin8)
+        population_base = np.array([kword['size'] for kword in kwords], dtype=np.uint8)
         population_base = np.add.accumulate(population_base)
         population_base = np.insert(population_base, 0, 0)
         os.makedirs(os.path.join(path, 'supplementary_info'), exist_ok=True)
@@ -379,7 +380,7 @@ class TestBlock(unittest.TestCase):
 
         conn = connect_for_multi_sparse_block(conn_prob, kwords,
                                               degree=degree,
-                                              init_min=0,
+                                              init_min=1,  # have modified as in the criticalNN experiment.
                                               init_max=1)
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
