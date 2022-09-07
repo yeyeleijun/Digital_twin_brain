@@ -8,11 +8,12 @@ import copy
 import time
 import numpy as np
 import torch
-from default_param import bold_params, v_th
+from default_params import bold_params, v_th
 from cuda.python.dist_blockwrapper_pytorch import BlockWrapper as block
 from models.bold_model_pytorch import BOLD
 from utils.pretty_print import pretty_print, table_print
 from utils.helpers import load_if_exist, torch_2_numpy
+from simulation.simulation import simulation
 import h5py
 
 
@@ -107,15 +108,17 @@ class StimulationVoxel:
         beta = torch.ones(self.num_populations, device="cuda:0") * 1e8
         self.block_model.gamma_property_by_subblk(population_info, alpha, beta, debug=False)
 
-    def gamma_initialize(self, param_index, alpha=5., beta=5.):
+    def gamma_initialize(self, population_id, param_index, alpha=5., beta=5.):
         """
         Use a distribution of gamma(alpha, beta) to update neuronal params,
         where alpha = beta = 5.
 
         Parameters
         ----------
+        population_id: Tensor
+            indicate the population id to be modified
 
-        param_index: list
+        param_index: int
             indicate the column index among 21 attributes of LIF neuron.
 
         alpha: float, default=5.
@@ -126,10 +129,10 @@ class StimulationVoxel:
 
         print(f"gamma_initialize {param_index}th attribute, to value gamma({alpha}, {beta}) distribution\n")
         population_info = torch.stack(
-            torch.meshgrid(self.population_id, torch.tensor(param_index, dtype=torch.int64, device="cuda:0")),
+            torch.meshgrid(population_id, torch.tensor(param_index, dtype=torch.int64, device="cuda:0")),
             dim=-1).reshape((-1, 2))
-        alpha = torch.ones(self.num_populations, device="cuda:0") * alpha
-        beta = torch.ones(self.num_populations, device="cuda:0") * beta
+        alpha = torch.ones(len(population_id), device="cuda:0") * alpha
+        beta = torch.ones(len(population_id), device="cuda:0") * beta
         self.block_model.gamma_property_by_subblk(population_info, alpha, beta, debug=False)
 
     def evolve(self, step, vmean_option=False, sample_option=False, imean_option=False) -> tuple:
@@ -171,13 +174,9 @@ class StimulationVoxel:
         for return_info in self.block_model.run(step, freqs=True, vmean=vmean_option, sample_for_show=sample_option,
                                                 imean=imean_option):
             Freqs, *others = return_info
-            print(Freqs.shape)
             total_res.append(return_info)
 
             freqs = Freqs.cpu().numpy()
-            print(return_info.shape)
-            print(freqs.shape)
-            print(self.population_id_cpu.shape)
             act = self.merge_data(self.population_id_cpu, freqs, self.num_voxels, (0, self.num_populations))
             act = (act / self.num_neurons_per_voxel_cpu).reshape(-1)
             act = torch.from_numpy(act).cuda()
@@ -201,8 +200,39 @@ class StimulationVoxel:
         if imean_option:
             temp_imean = torch.stack([x[-1] for x in total_res], dim=0)
             out += (temp_imean,)
-        out += (bold_out, )
+        out += (bold_out,)
         return out
+
+    def info_specified_region(self, aal_region, specified_region=(90, 91)):
+        """
+        Return the information of specified regions
+
+        Parameters
+        ----------
+        aal_region: array
+            the information of all voxels belong to which region
+        specified_region: tuple
+            the region to be inquired
+        Returns
+        ----------
+        population_id_belong_to_specified_region: array
+
+        neuron_id_belong_to_region: array
+        """
+        specified_region = np.array(specified_region)
+        voxel_id_belong_to_specified_region = np.isin(aal_region, specified_region).nonzero()[0]
+        population_id_belong_to_specified_region = np.concatenate(
+            [np.arange(temp * self.populations_per_voxel, (temp + 1) * self
+                       .populations_per_voxel) for temp in voxel_id_belong_to_specified_region])
+        neuron_id_belong_to_region = []
+        num_neurons_per_population_base_cpu = np.add.accumulate(self.num_neurons_per_population_cpu)
+        num_neurons_per_population_base_cpu = np.insert(num_neurons_per_population_base_cpu, 0, 0)
+        for idx in population_id_belong_to_specified_region:
+            neuron_id_belong_to_region.append(
+                np.arange(num_neurons_per_population_base_cpu[idx], num_neurons_per_population_base_cpu[idx + 1]))
+        neuron_id_belong_to_region = np.concatenate(neuron_id_belong_to_region)
+        print(f"{len(voxel_id_belong_to_specified_region)} voxels, {len(population_id_belong_to_specified_region)} populations and {len(neuron_id_belong_to_region)} neurons in region {specified_region}")
+        return population_id_belong_to_specified_region.astype(np.int64), neuron_id_belong_to_region.astype(np.int64)
 
     def run(self, step=800, observation_time=100, hp_path='./', hp_index=None, whole_brain_info='./'):
         """
@@ -223,6 +253,7 @@ class StimulationVoxel:
         info = {'name': self.name, "num_neurons": self.num_neurons, 'num_voxels': self.num_voxels,
                 'num_populations': self.num_populations}
         table_print(info)
+        print(f"imean_option: {self.imean_option}")
 
         hp_total = np.load(hp_path)
         assert hp_total.shape[1] == self.num_voxels
@@ -230,24 +261,47 @@ class StimulationVoxel:
         hp_index = torch.tensor(hp_index, dtype=torch.int64, device="cuda:0")
         start_time = time.time()
         for k in hp_index:
-            self.gamma_initialize(k)
+            self.gamma_initialize(self.population_id, k)
         population_info = torch.stack(torch.meshgrid(self.population_id, hp_index), dim=-1).reshape((-1, 2))
         self.block_model.mul_property_by_subblk(population_info, hp_total[0].reshape(-1))
         freqs, _ = self.evolve(3200, vmean_option=False, sample_option=False, imean_option=False)
         Init_end = time.time()
         if self.print_info:
             print(
-                f"max fre: {torch.max(torch.mean(freqs / self.num_neurons_per_population.float() * 1000, dim=0)):.1f}")
+                f"mean fre: {torch.mean(torch.mean(freqs / self.num_neurons_per_population.float() * 1000, dim=0)):.1f}")
         pretty_print(f"Init have Done, cost time {Init_end - start_time:.2f}")
 
         hp_total = hp_total[1:]
         total_T = hp_total.shape[0]
         assert observation_time <= total_T
 
-        # file = h5py.File(whole_brain_info, 'r')
-        # aal_region = np.array(file["dti_AAL_stn"], dtype=np.int32).squeeze() - 1
+        file = h5py.File(whole_brain_info, 'r')
+        aal_region = np.array(file["dti_AAL_stn"], dtype=np.int32).squeeze() - 1
         # if self.sample_option:
         #     self.sample(aal_region, specified_info=None)
+
+        # stimulation setting to mimic beta oscillation
+        stim_density = 0.1  # Amplitude
+        freqs_stim = 15  # Hz
+        sample_rate = 1000  # Hz
+        T = observation_time * step
+        current_beta = stim_density * np.sin(np.linspace(0, 2 * np.pi * freqs_stim * T / sample_rate, T), dtype=np.float32)
+        current_beta = torch.from_numpy(current_beta).cuda()
+
+        population_id_stim, _ = self.info_specified_region(aal_region, specified_region=(74, 75, 90, 91))
+        population_id_stim = torch.from_numpy(population_id_stim).cuda()
+        num_populations_stim = len(population_id_stim)
+        self.gamma_initialize(population_id_stim, 2)
+        pro_idx_extern_input_current = torch.tensor([2], dtype=torch.int64, device="cuda:0")   # property idx 2 is I_extern_Input
+        population_stim_info = torch.stack(torch.meshgrid(population_id_stim, pro_idx_extern_input_current), dim=-1).reshape((-1, 2))
+        self.block_model.mul_property_by_subblk(population_stim_info, torch.ones(num_populations_stim, device="cuda:0") * 0.0001)
+
+        # deep brain stimulation setting
+        current_dbs = np.ones([T], dtype=np.float32) * 0.0001
+        freqs_dbs = 125
+        for i in range(T//2, T, sample_rate//freqs_dbs):
+            current_dbs[i] = -6
+        current_dbs = torch.from_numpy(current_dbs).cuda()
 
         pretty_print("Begin Simulation")
         print(f"Total time is {total_T}, we only simulate {observation_time}\n")
@@ -268,24 +322,39 @@ class StimulationVoxel:
                 i = ii * 50 + j
                 t_sim_start = time.time()
                 self.block_model.mul_property_by_subblk(population_info, hp_total[i].reshape(-1))
-                out = self.evolve(step, vmean_option=self.vmean_option, sample_option=self.sample_option,
-                                  imean_option=self.imean_option)
-                FFreqs[j] = torch_2_numpy(out[0])
-                if self.vmean_option:
-                    Vmean[j] = torch_2_numpy(out[1])
-                if self.sample_option:
+                # for i_step in range(step//10):
+                #     self.block_model.mul_property_by_subblk(population_stim_info,
+                #                                                 -1 * torch.ones(num_populations_stim, device="cuda:0") * 2)
+                #     out = self.evolve(1, vmean_option=self.vmean_option, sample_option=self.sample_option,
+                #                           imean_option=self.imean_option)
+                #     FFreqs[j, i_step*10:i_step*10+1, :] = torch_2_numpy(out[0])
+                #     self.block_model.mul_property_by_subblk(population_stim_info,
+                #                                                 torch.ones(num_populations_stim, device="cuda:0") * 0.0001)
+                #     out = self.evolve(9, vmean_option=self.vmean_option, sample_option=self.sample_option,
+                #                           imean_option=self.imean_option)
+                #     FFreqs[j, i_step*10+1:i_step*10+10, :] = torch_2_numpy(out[0])
+                for i_step in range(step):
+                    curr_stim = torch.ones(num_populations_stim, device="cuda:0") * current_beta[i * step + i_step]
+                    curr_stim[-4:] += current_dbs[i * step + i_step]
+                    self.block_model.mul_property_by_subblk(population_stim_info, curr_stim)
+                    out = self.evolve(1, vmean_option=self.vmean_option, sample_option=self.sample_option,
+                                      imean_option=self.imean_option)
+                    FFreqs[j, i_step, :] = torch_2_numpy(out[0])
                     if self.vmean_option:
-                        Spike[j] = torch_2_numpy(out[2])
-                        Vi[j] = torch_2_numpy(out[3])
-                    else:
-                        Spike[j] = torch_2_numpy(out[1])
-                        Vi[j] = torch_2_numpy(out[2])
-                if self.imean_option:
-                    Imean[j] = torch_2_numpy(out[-2])
+                        Vmean[j, i_step, :] = torch_2_numpy(out[1])
+                    if self.sample_option:
+                        if self.vmean_option:
+                            Spike[j, i_step, :] = torch_2_numpy(out[2])
+                            Vi[j, i_step, :] = torch_2_numpy(out[3])
+                        else:
+                            Spike[j, i_step, :] = torch_2_numpy(out[1])
+                            Vi[j, i_step, :] = torch_2_numpy(out[2])
+                    if self.imean_option:
+                        Imean[j, i_step, :] = torch_2_numpy(out[-2])
                 bold_out[i, :] = torch_2_numpy(out[-1])
                 t_sim_end = time.time()
                 print(
-                    f"{i}th observation time, max fre: {torch.max(torch.mean(out[0] / self.num_neurons_per_population.float() * 1000, dim=0)):.1f}, cost time {t_sim_end - t_sim_start}:.1f")
+                    f"{i}th observation time, mean fre: {torch.mean(torch.mean(out[0] / self.num_neurons_per_population.float() * 1000, dim=0)):.1f}, cost time {t_sim_end - t_sim_start:.1f}")
             np.save(os.path.join(self.write_path, "freqs_after_assim_{}.npy".format(ii)), FFreqs)
             if self.vmean_option:
                 np.save(os.path.join(self.write_path, "vmean_after_assim_{}.npy".format(ii)), Vmean)
