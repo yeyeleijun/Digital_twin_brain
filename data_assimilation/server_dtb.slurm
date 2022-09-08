@@ -7,7 +7,7 @@
 #SBATCH --mem=0
 #SBATCH --gres=dcu:4
 
-#SBATCH -N 201
+#SBATCH -N 151
 #SBATCH -x j10r2n07,e13r4n02,b01r2n17
 ##SBATCH --exclude=./black_list
 ##SBATCH --exclude=./black_list_jmd
