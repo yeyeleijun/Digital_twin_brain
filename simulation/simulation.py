@@ -257,7 +257,7 @@ class simulation(object):
             act = torch.from_numpy(act).cuda()
             bold_out = self.bold.run(torch.max(act, torch.tensor([1e-05]).type_as(act)))
         if bold_detail:
-            return act, self.bold.s, self.bold.q, self.bold.v, self.bold.f_in
+            return act, self.bold.s, self.bold.q, self.bold.v, self.bold.f_in, bold_out
         temp_freq = torch.stack([x[0] for x in total_res], dim=0)
         out = (temp_freq, )
         if vmean_option:
