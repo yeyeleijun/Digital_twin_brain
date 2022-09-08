@@ -2,8 +2,7 @@
 # @Time : 2022/8/10 14:31 
 # @Author : lepold
 # @File : test_generation.py
-
-
+import os
 import unittest
 import h5py
 from mpi4py import MPI
@@ -14,6 +13,47 @@ import sparse
 
 
 class TestBlock(unittest.TestCase):
+    @staticmethod
+    def _make_directory_tree(root_path, scale, degree, init_min, init_max, extra_info):
+        """
+        make directory tree for each subject.
+
+        Parameters
+        ----------
+        root_path: str
+            each subject has a root path.
+
+        scale: int
+            number of neurons of whole brain.
+        degree:
+            in-degree of each neuron.
+
+        init_min: float
+            the lower bound of uniform distribution where w is sampled from.
+
+        init_max: float
+            the upper bound of uniform distribution where w is sampled from.
+
+        extra_info: str
+            supplementary information.
+
+        Returns
+        ----------
+        second_path: str
+            second path to save connection table
+
+        """
+        os.makedirs(root_path, exist_ok=True)
+        os.makedirs(os.path.join(root_path, "raw_data"), exist_ok=True)
+        second_path = os.path.join(root_path, f"dti_distribution_{int(scale//1e6)}m_d{degree}_w{init_min}_{init_max}_{extra_info}")
+        os.makedirs(second_path, exist_ok=True)
+        os.makedirs(os.path.join(second_path, "single"), exist_ok=True)
+        os.makedirs(os.path.join(second_path, "ensembles"), exist_ok=True)
+        os.makedirs(os.path.join(second_path, "supplementary_info"), exist_ok=True)
+        os.makedirs(os.path.join(second_path, "DA"), exist_ok=True)
+
+        return second_path
+
     @staticmethod
     def _add_laminar_cortex_model(conn_prob, gm, canonical_voxel=False):
         """
@@ -366,7 +406,8 @@ class TestBlock(unittest.TestCase):
 
     def test_generate_normal_voxel_whole_brain(self, path="./data/jianfeng_normal", degree=100,
                                                 minimum_neurons_for_block=(200, 50),
-                                                scale=int(1e8)):
+                                                scale=int(1e8), init_min=1, init_max=1):
+        second_path = self._make_directory_tree(root_path, scale, degree, init_min, init_max, "critical")
         blocks = int(scale / 5e6)
         print(f"Total {scale} neurons for DTB, merge to {blocks} blocks")
         file = h5py.File(
@@ -389,23 +430,22 @@ class TestBlock(unittest.TestCase):
         conn_prob, block_size, degree_scale = self._add_laminar_cortex_model(conn_prob, block_size,
                                                                              canonical_voxel=True)
         # gui = np.array([6.1644921e-03, 8.9986715e-04, 2.9690875e-02, 1.9053727e-03], dtype=np.float64) # old setting, noise rate=0.01, totally steady spike, 1ms iteration
-        gui = np.array([0.01935443, 0.00052911, 0.09493671, 0.02250352], dtype=np.float64)  # find in sub critical in 3hz noise rate and 0.1ms iteration resolution.
+        gui = np.array([0.01837975, 0.00072405, 0.10759494, 0.02180028], dtype=np.float64)  # find in sub critical in 3hz noise rate and 0.1ms iteration resolution.
         degree = np.maximum((degree * degree_scale).astype(np.uint16), 1)
 
         kwords = [{"V_th": -50,
                    "V_reset": -65,
                    'g_Li': 0.03,
                    'g_ui': gui,
-                   'tao_ui': (2, 40, 10, 50),
-                   'noise_rate': 0.0003,
+                   'tao_ui': (8, 40, 10, 50),  # old setting: [2, 40, 10, 50]
+                   'noise_rate': 0.003,  # old setting: 0.01 Hz
                    "size": int(max(b * scale, minimum_neurons_for_block[i % 2]))}
                   for i, b in enumerate(block_size)]
 
         population_base = np.array([kword['size'] for kword in kwords], dtype=np.int64)
         population_base = np.add.accumulate(population_base)
         population_base = np.insert(population_base, 0, 0)
-        os.makedirs(os.path.join(path, 'supplementary_info'), exist_ok=True)
-        np.save(os.path.join(path, 'supplementary_info', "population_base.npy"), population_base)
+        np.save(os.path.join(second_path, "supplementary_info", "population_base.npy"), population_base)
 
         conn = connect_for_multi_sparse_block(conn_prob, kwords,
                                               degree=degree,
@@ -416,7 +456,7 @@ class TestBlock(unittest.TestCase):
         size = comm.Get_size()
 
         for i in range(rank, blocks, size):
-            merge_dti_distributation_block(conn, path,
+            merge_dti_distributation_block(conn, second_path,
                                            MPI_rank=i,
                                            number=blocks,
                                            dtype="single",

@@ -370,8 +370,8 @@ class simulation(object):
             hp_total = np.load(hp_path)
             assert hp_total.shape[1] == self.total_populations
             hp_total = torch.from_numpy(hp_total.astype(np.float32)).cuda()
-            self.run(step=800, observation_time=100, hp_index=hp_index, hp_total=hp_total)
+            self.run(step=step, observation_time=observation_time, hp_index=hp_index, hp_total=hp_total)
         else:
-            self.run(step=800, observation_time=100, hp_index=None, hp_total=None)
+            self.run(step=step, observation_time=observation_time, hp_index=None, hp_total=None)
 
         self.block_model.shutdown()
