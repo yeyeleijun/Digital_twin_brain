@@ -137,7 +137,7 @@ def specified_sample(aal_region, neurons_per_population_base, specified_info=Non
     Parameters
     ----------
 
-    aal_region: ndarrau
+    aal_region: ndarray
         indicate the brain regions label of each voxel.
 
     neurons_per_population_base: ndarray
@@ -236,5 +236,73 @@ def specified_sample(aal_region, neurons_per_population_base, specified_info=Non
                 break
             except:
                 continue
+
+    return sample_idx.astype(np.int64)
+
+
+def sample_voxel(aal_region, neurons_per_population_base, num_sample_voxel_per_region=1,
+                                       num_neurons_per_voxel=300):
+    """
+    For DTB of voxel version, more convenient version to sample neurons for ``stimulation`` object.
+
+    neurons_per_population_base is read from :class:`population_base.npy <.TestBlock>` which is generated during generation of connection table.
+
+
+    Parameters
+    ----------
+
+    aal_region: ndarray
+        indicate the brain regions label of each voxel.
+
+    neurons_per_population_base: ndarray
+        The accumulated number of neurons for each population , corresponding to the population_id.
+        corresponding to [0, 1, 2, 3, 4,... 227029]
+
+    num_sample_voxel_per_region: int, default=1
+        the sample number of voxels in each region.
+
+    num_neurons_per_voxel: int, default=300
+        the sample number of neurons in each voxel .
+
+    specified_info: ndarray
+        according the specified_info info , we can randomly sample neurons which are from given voxel id.
+
+    Returns
+    -------
+
+    ndarray which contain sample information
+
+    ----------------|------------------
+    0 th column     |    neuron id
+    1 th column     |    population id
+    2 th column     |    voxel id
+    3 th column     |    region id
+    ----------------|------------------
+
+    """
+    uni_region = np.arange(np.unique(aal_region).shape[0])
+    assert uni_region.max() == aal_region.max()
+    num_sample_neurons = len(uni_region) * num_neurons_per_voxel * num_sample_voxel_per_region
+    sample_idx = np.empty([num_sample_neurons, 4], dtype=np.int64)
+
+    m = 0
+    for region_idx in uni_region:
+        print("Sampling for region: ", region_idx)
+        voxels_belong_to_region = np.isin(aal_region, region_idx).nonzero()[0]
+        sample_voxels = np.random.choice(voxels_belong_to_region, num_sample_voxel_per_region, replace=False)
+        for voxel_idx in sample_voxels:
+            print(f"Sampling for voxel: {voxel_idx}")
+            num_neuron_E = int(num_neurons_per_voxel*0.8)
+            sample_E = np.random.choice(np.arange(neurons_per_population_base[voxel_idx*2], neurons_per_population_base[voxel_idx*2+1]),
+                                    num_neuron_E, replace=False)
+            num_neuron_I = int(num_neurons_per_voxel * 0.2)
+            sample_I = np.random.choice(np.arange(neurons_per_population_base[voxel_idx*2+1], neurons_per_population_base[voxel_idx*2+2]),
+                                    num_neuron_I, replace=False)
+            sample_neuron = np.concatenate((sample_E, sample_I), axis=0)
+            sample_idx[num_neurons_per_voxel * m:num_neurons_per_voxel * (m + 1), 0] = sample_neuron
+            sample_idx[num_neurons_per_voxel * m:num_neurons_per_voxel * (m + 1), 1] = np.concatenate((np.repeat(np.array([voxel_idx*2]), num_neuron_E), np.repeat(np.array([voxel_idx*2+1]), num_neuron_I)))
+            sample_idx[num_neurons_per_voxel * m:num_neurons_per_voxel * (m + 1), 2] = np.repeat(np.array([voxel_idx]), num_neurons_per_voxel)
+            sample_idx[num_neurons_per_voxel * m:num_neurons_per_voxel * (m + 1), 3] = np.repeat(np.array([region_idx]), num_neurons_per_voxel)
+            m = m + 1
 
     return sample_idx.astype(np.int64)
