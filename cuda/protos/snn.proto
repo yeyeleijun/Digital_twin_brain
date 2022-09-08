@@ -1,0 +1,192 @@
+syntax = "proto3";
+
+package snn;
+
+service Snn{
+	rpc Init(InitRequest) returns (stream InitResponse) {}
+	rpc Run(RunRequest) returns (stream RunResponse) {}
+	rpc Measure(MetricRequest) returns (stream MetricResponse) {}
+	rpc Updateprop(stream UpdatePropRequest) returns (UpdatePropResponse) {}
+	rpc Updategamma(stream UpdateGammaRequest) returns (UpdateGammaResponse) {}
+	rpc Updategammawithresult(stream UpdateGammaRequest) returns (stream UpdateGammaWithResultResponse) {}
+	rpc Updatehyperpara(stream UpdateHyperParaRequest) returns (UpdateHyperParaResponse) {}
+	rpc Updatesample(stream UpdateSampleRequest) returns (UpdateSampleResponse) {}
+	rpc Shutdown(ShutdownRequest) returns (ShutdownResponse) {}
+}
+
+message InitRequest {
+	enum CommMode
+	{
+		COMM_POINT_TO_POINT = 0;
+		COMM_ROUTE_WITHOUT_MERGE = 1;
+		COMM_ROUTE_WITH_MERGE = 2;
+	}
+	
+	string file_path = 1;
+	string route_path = 2;
+	float delta_t = 3;
+	CommMode mode = 4;
+}
+
+message SubblockInfo {
+	int32 subblk_id = 1;
+	int32 subblk_num = 2;
+}
+
+enum SnnStatus{
+   SNN_OK = 0;
+   SNN_INVALID_PARAMETER = 1;
+   SNN_UNSET_SAMPLE_FAILURE = 2;
+   SNN_UNSUPPORTED = 3;
+};
+
+message InitResponse {
+	SnnStatus status = 1;
+	int32 block_id = 2;
+	int32 neurons_per_block = 3;
+	repeated SubblockInfo subblk_info = 4;
+	double used_cpu_mem = 5;
+	double total_gpu_mem = 6;
+	double used_gpu_mem = 7;
+}
+
+message RunRequest {
+	enum Strategy
+	{
+		STRATEGY_SEND_SEQUENTIAL = 0;
+		STRATEGY_SEND_PAIRWISE = 1;
+		STRATEGY_SEND_RANDOM = 2;
+	}
+
+	int32 iter = 1;
+	int32 iter_offset = 2;
+	bool output_freq = 3;
+	bool output_vmean = 4;
+	bool output_sample = 5;
+	Strategy strategy = 6;
+	bool output_imean = 7;
+}
+
+message RunResponse {
+	SnnStatus status = 1;
+	repeated bytes freq = 2;
+	repeated bytes vmean = 3;
+	repeated bytes sample_spike = 4; 
+	repeated bytes sample_vmemb = 5; 
+	repeated bytes imean = 6; 
+}
+
+message MetricRequest {
+}
+
+//message MetricInfo{
+//	double max_duration_per_iteration = 1;
+//	double min_duration_per_iteration = 2;
+//	double avg_duration_per_iteration = 3;
+//}
+
+//message MetricResponse {
+//	string name = 1;
+//	MetricInfo computed_metric = 2;
+//	MetricInfo queued_metric = 3; 
+//	MetricInfo communicated_metric = 4; 
+//	MetricInfo reported_metric = 5;
+//}
+
+message MetricInfo{
+	string name = 1;
+	double computing_duration = 2;
+	double reporting_duration = 3;
+	double duration_inter_node = 4;
+	double duration_intra_node = 5;
+	uint64 sending_byte_size_inter_node = 6;
+	uint64 sending_byte_size_intra_node = 7;
+	uint64 recving_byte_size_inter_node = 8;
+	uint64 recving_byte_size_intra_node = 9;
+}
+
+message MetricResponse {
+	SnnStatus status = 1;
+	repeated MetricInfo metric = 2;
+}
+
+enum PropType{
+	EXT_STIMULI_I = 0;
+	MEMBRANE_C = 1;
+	REF_T = 2;
+	LEAKAGE_G = 3;
+	LEAKAGE_V = 4;
+	THRESHOLD_V = 5;
+	RESET_V = 6;
+	CONDUCT_G_AMPA = 7;
+	CONDUCT_G_NMDA = 8;
+	CONDUCT_G_GABAa = 9;
+	CONDUCT_G_GABAb = 10;
+	MEMBRANE_V_AMPA = 11;
+	MEMBRANE_V_NMDA = 12;
+	MEMBRANE_V_GABAa = 13;
+	MEMBRANE_V_GABAb = 14;
+	TAO_AMPA = 15;
+	TAO_NMDA = 16;
+	TAO_GABAa = 17;
+	TAO_GABAb = 18;
+	NOISE_RATE = 19;
+};
+
+message UpdatePropRequest {
+	int32 block_id = 1;
+	repeated int32 neuron_id = 2;
+	repeated PropType prop_id = 3;
+	repeated float prop_val = 4;
+}
+
+message UpdatePropResponse {
+	bool success = 1;
+}
+
+message UpdateGammaRequest {
+	int32 block_id = 1;
+	repeated PropType prop_id = 2;
+	repeated int32 brain_id = 3;
+	repeated float gamma_concentration = 4;
+	repeated float gamma_rate = 5;
+}
+
+message UpdateGammaResponse {
+	bool success = 1;
+}
+
+message UpdateGammaWithResultResponse {
+	int32 block_id = 1;
+	PropType prop_id = 2;
+	int32 brain_id = 3;
+	repeated bytes prop_val = 4;
+}
+
+message UpdateHyperParaRequest {
+	int32 block_id = 1;
+	repeated PropType prop_id = 2;
+	repeated int32 brain_id = 3;
+	repeated float hpara_val = 4;
+}
+
+message UpdateHyperParaResponse {
+	bool success = 1;
+}
+
+message UpdateSampleRequest {
+	int32 block_id = 1;
+	repeated int32 sample_idx = 2;
+}
+
+message UpdateSampleResponse {
+	bool success = 1;
+}
+
+message ShutdownRequest {
+}
+
+message ShutdownResponse {
+	bool shutdown = 1;
+}
+
