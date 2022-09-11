@@ -73,7 +73,7 @@ def rest_demo(args):
     da_rest.get_hidden_state(steps=1000)
     # da_rest run
     bold_real = torch.cat((bold_real, bold_real[:, :296]), dim=1)
-    da_rest.da_rest_run(bold_real, path_out)
+    da_rest.da_rest_run(bold_real, path_out, 30)
 
 
 def task_demo(args):
