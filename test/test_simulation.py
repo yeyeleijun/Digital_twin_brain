@@ -41,7 +41,7 @@ def rest_column_simulation(args):
     aal_region = np.load(args.aal_info_path)['aal_region']
     population_base = np.load(os.path.join(args.block_dir, "supplementary_info", "population_base.npy"))
     model.sample(aal_region, population_base)
-    model(observation_time=100, hp_index=[10], hp_path=args.hp_after_da_path)
+    model(observation_time=100, hp_index=10, hp_path=args.hp_after_da_path)
 
 
 

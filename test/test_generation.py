@@ -5,7 +5,7 @@
 import os
 import unittest
 import h5py
-from mpi4py import MPI
+# from mpi4py import MPI
 import numpy as np
 
 from generation.make_block import *
@@ -305,7 +305,7 @@ class TestBlock(unittest.TestCase):
             out_conn_prob = out_conn_prob / out_conn_prob.sum(axis=1, keepdims=True)
         return out_conn_prob, out_gm, out_degree_scale
 
-    def _test_make_small_block(self, write_path, initial_parameter=(0.00495148, 0.0009899, 0.08417509, 0.00458287)):
+    def test_make_small_block(self, write_path="../small_blocks", initial_parameter=(0.00495148, 0.0009899, 0.08417509, 0.00458287)):
         prob = torch.tensor([[0.8, 0.2], [0.8, 0.2]])
         tau_ui = (2, 40, 10, 50)
         population_kwards = [{'g_Li': 0.03,
@@ -404,7 +404,7 @@ class TestBlock(unittest.TestCase):
                                            dtype="single",
                                            debug_block_dir=None)
 
-    def test_generate_normal_voxel_whole_brain(self, path="./data/jianfeng_normal", degree=100,
+    def _test_generate_normal_voxel_whole_brain(self, path="./data/jianfeng_normal", degree=100,
                                                 minimum_neurons_for_block=(200, 50),
                                                 scale=int(1e8), init_min=1, init_max=1):
         second_path = self._make_directory_tree(root_path, scale, degree, init_min, init_max, "critical")

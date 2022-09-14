@@ -3,12 +3,15 @@
 # @Author : lepold
 # @File : draw.py
 
+import argparse
 import os
+
+import matplotlib.pyplot as plt
 import numpy as np
-from scipy.io import loadmat
 import pandas as pd
 import torch
-import matplotlib.pyplot as plt
+from scipy.io import loadmat
+
 from utils.helpers import np_move_avg
 
 
@@ -36,7 +39,7 @@ def draw(log_path, freqs, block_size, sample_idx, write_path, name_path, bold_pa
     T, voxels = bold_simulation.shape
     bold_y = np.load(real_bold_path)["rest_bold"]
     bold_y = bold_y.T
-    bold_y = 0.02 + 0.03 * (bold_y - bold_y.min()) / (bold_y.max() - bold_y.min())
+    bold_y = 0.01 + 0.03 * (bold_y - bold_y.min()) / (bold_y.max() - bold_y.min())
     real_bold = bold_y[:T, :voxels]
 
     property = np.load(sample_idx)
@@ -235,3 +238,30 @@ def process_block(write_path, real_block, block_i, log, split, name, fire_rate, 
     plt.close(fig_bold)
 
     return block_i, name
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Model simulation")
+    parser.add_argument("--log_path", type=str,
+                        default="../data/subject1/rest_da_ampa/simulation_aug_13th/spike_after_assim_1.npy")
+    parser.add_argument("--freqs", type=str,
+                        default="../data/subject1/rest_da_ampa/simulation_aug_13th/freqs_after_assim_1.npy")
+    parser.add_argument("--block_size", type=str,
+                        default="../data/subject1/rest_da_ampa/simulation_aug_13th/blk_size.npy")
+    parser.add_argument("--sample_idx", type=str,
+                        default="../data/subject1/rest_da_ampa/simulation_aug_13th/sample_idx.npy")
+    parser.add_argument("--name_path", type=str,
+                        default="/public/home/ssct004t/project/zenglb/spiking_nn_for_simulation/aal_names.mat")
+    parser.add_argument("--bold_path", type=str,
+                        default="../data/subject1/rest_da_ampa/simulation_aug_13th/bold_after_assim.npy")
+    parser.add_argument("--real_bold_path", type=str,
+                        default="/public/home/ssct004t/project/zenglb/spiking_nn_for_simulation/whole_brain_voxel_info.npz")
+    parser.add_argument("--vmean_path", type=str,
+                        default="../data/subject1/rest_da_ampa/simulation_aug_13th/vmean_after_assim_1.npy")
+    parser.add_argument("--vsample", type=str,
+                        default="../data/subject1/rest_da_ampa/simulation_aug_13th/vi_after_assim_1.npy")
+    parser.add_argument("--write_path", type=str, default="../data/subject1/rest_da_ampa/simulation_aug_13th/fig")
+    args = parser.parse_args()
+    draw(args.log_path, args.freqs, args.block_size, args.sample_idx, args.write_path, args.name_path, args.bold_path,
+         args.real_bold_path, args.vmean_path,
+         args.vsample)

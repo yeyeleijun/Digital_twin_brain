@@ -264,8 +264,9 @@ class simulation(object):
             temp_vmean = torch.stack([x[1] for x in total_res], dim=0)
             out += (temp_vmean, )
         if sample_option:
-            temp_vsamle = torch.stack([x[3] for x in total_res], dim=0)
-            temp_spike = torch.stack([x[2] for x in total_res], dim=0)
+            temp_vsamle = torch.stack([x[-1] for x in total_res], dim=0)
+            temp_spike = torch.stack([x[-2] for x in total_res], dim=0)
+            print("temp_spike", temp_spike.shape, temp_spike.dtype, temp_spike.max())
             temp_spike &= (torch.abs(temp_vsamle - v_th) / 50 < 1e-5)
             out += (temp_spike, temp_vsamle, )
         out += (bold_out, )
@@ -328,7 +329,7 @@ class simulation(object):
                     Vmean[j] = torch_2_numpy(out[1])
                 if self.sample_option:
                     Spike[j] = torch_2_numpy(out[-3])
-                    Vi[j] = Spike[j] = torch_2_numpy(out[-2])
+                    Vi[j] = torch_2_numpy(out[-2])
                 bolds_out[i, :] = torch_2_numpy(out[-1])
                 t_sim_end= time.time()
                 print(
