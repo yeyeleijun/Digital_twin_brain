@@ -87,12 +87,13 @@ def rest_simulation(args):
     os.makedirs(path_out, exist_ok=True)
     os.makedirs(path_out + 'figure/', exist_ok=True)
     bold_real = get_bold_signal(args.bold_path, b_min=0.02, b_max=0.05, lag=0)
-    hp_after_da = np.load(args.pathout + args.gui_path)
+    hp_after_da = np.load(args.path_out + args.gui_path)
     observation_time, num_da_population_pblk, hp_num = hp_after_da.shape
     print(observation_time, num_da_population_pblk, hp_num)
     da_simulation = simulation(args.block_path, args.ip, column=False, print_info=True, write_path=path_out)
     da_simulation.clear_mode()
-    da_simulation.run(step=800, observation_time=observation_time, hp_index=10, hp_total=hp_after_da)
+    hp_after_da = torch.from_numpy(hp_after_da.astype(np.float32)).cuda()[:, :, 0]
+    da_simulation.run(step=800, observation_time=observation_time-1, hp_index=10, hp_total=hp_after_da)
 
 
 if __name__ == "__main__":
