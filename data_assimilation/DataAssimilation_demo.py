@@ -4,6 +4,7 @@ import time
 import numpy as np
 import torch
 from DataAssimilation import *
+from simulation.simulation import simulation
 
 
 def get_args():
@@ -70,14 +71,28 @@ def rest_demo(args):
     # da_rest.hp_index2hidden_state('/public/home/ssct004t/project/zenglb/Digital_twin_brain/data_assimilation/path_cortical_or_not.npy')
     da_rest.hp_index2hidden_state()
     da_rest.da_property_initialize(property_index, args.gui_alpha, da_gui)
-    da_rest.get_hidden_state(steps=1000)
+    da_rest.get_hidden_state()
     # da_rest run
     bold_real = torch.cat((bold_real, bold_real[:, :296]), dim=1)
-    da_rest.da_rest_run(bold_real, path_out, 30)
+    da_rest.da_rest_run(bold_real, path_out)
 
 
 def task_demo(args):
     pass
+
+
+def rest_simulation(args):
+    property_index = np.array([int(s) for s in args.para_ind.split()]).reshape(-1)
+    path_out = args.path_out + '/simulation/'
+    os.makedirs(path_out, exist_ok=True)
+    os.makedirs(path_out + 'figure/', exist_ok=True)
+    bold_real = get_bold_signal(args.bold_path, b_min=0.02, b_max=0.05, lag=0)
+    hp_after_da = np.load(args.pathout + args.gui_path)
+    observation_time, num_da_population_pblk, hp_num = hp_after_da.shape
+    print(observation_time, num_da_population_pblk, hp_num)
+    da_simulation = simulation(args.block_path, args.ip, column=False, print_info=True, write_path=path_out)
+    da_simulation.clear_mode()
+    da_simulation.run(step=800, observation_time=observation_time, hp_index=10, hp_total=hp_after_da)
 
 
 if __name__ == "__main__":
@@ -86,3 +101,5 @@ if __name__ == "__main__":
         rest_demo(args)
     if args.task == 'task':
         task_demo(args)
+    if args.task == 'rest simulation':
+        rest_simulation(args)

@@ -19,7 +19,7 @@ mpirun python3 DataAssimilation_demo.py \
   --block_path='/public/home/ssct004t/project/yeleijun/Digital_twin_brain/PD-sub401/dti_distribution_100m_d100_w0_1/ensembles' \
   --path_out='/public/home/ssct004t/project/wenyong36/Digital_twin_brain/toymodel/' \
   --para_ind='10' \
-  --gui_real='0.01935443 0.00052911 0.09493671 0.02250352' \
+  --gui_real='0.00618016 8.9986715e-04 0.07027743 1.9053727e-03' \
   --bold_sigma=1e-8 \
   --hp_sigma=1 \
   --hp_range_rate='4 2' \

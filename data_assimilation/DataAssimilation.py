@@ -52,11 +52,11 @@ def diffusion_enkf(w_hat, bold_sigma, bold_t, solo_rate, debug=False):
     w += (1 - solo_rate) * torch.mm(torch.mm(bold_with_noise - w_hat[:, :, -1], temp.T) / brain_num,
                                     w_diff.reshape([ensembles, -1])).reshape(w_hat.shape)
     if debug:
-        print(w_cxx.max(), w_cxx.min(), w[:, :, :-6].max(), w[:, :, :-6].min())
         w_debug = w_hat[:, :10, -1][None, :, :] + (bold_with_noise - w_hat[:, :, -1]).T[:, :, None] \
                   * torch.mm(temp.T, w_diff[:, :10, -1])[:, None, :]  # brain_num, ensemble, 10
         return w, w_debug
     else:
+        print(w_cxx.max(), w_cxx.min(), w[:, :, :-6].max(), w[:, :, :-6].min())
         return w
 
 
@@ -103,7 +103,7 @@ class DataAssimilation(simulation):
         self._hp = None  # shape=(ensemble_n* num_da_population_pblk*hp_num)
         self._hp_low = None  # shape=(num_da_population_pblk*hp_num)
         self._hp_high = None  # shape=(num_da_population_pblk*hp_num)
-        self._hp_num = None
+        self._hp_num = None  # len(property)
         self.for_hidden_state = None
         self.from_hidden_state = None
 
@@ -233,8 +233,8 @@ class DataAssimilation(simulation):
             gui_low_ppopu = gui_low_ppopu.repeat(num_da_populations_pblk, 1)
             gui_high_ppopu = gui_high_ppopu.repeat(num_da_populations_pblk, 1)
         assert gui_low_ppopu.shape[0] == num_da_populations_pblk
-        self._hp_num = gui_low_ppopu.shape[1]  # 2 or 8
-        self._hp_low = gui_low_ppopu.reshape(-1).type_as(self.type_float)  # shape=num_da_populations_pblk * 2 or 8
+        self._hp_num = gui_low_ppopu.shape[1]
+        self._hp_low = gui_low_ppopu.reshape(-1).type_as(self.type_float)
         self._hp_high = gui_high_ppopu.reshape(-1).type_as(self.type_float)
         # method 1
         self._hp_log = torch.linspace(-20, 20, self.ensemble_number).repeat_interleave(len(self._hp_low))
@@ -318,10 +318,10 @@ class DataAssimilation(simulation):
         index_da_population = self.populations if index_da_population is None else index_da_population
         self._hp_index_updating = torch.stack((torch.meshgrid(index_da_population, self._property_index)),
                                               dim=1).reshape(-1, 2).type_as(self.type_int)
-        # print(self._hp_index_updating, self._hp_index_updating[:, 1], self._hp_index_updating[:, 0])
+        print(self._hp_index_updating, self._hp_index_updating[:, 1], self._hp_index_updating[:, 0], gui.shape)
         self.mul_property_by_subblk(self._hp_index_updating, gui.type_as(self.type_float).reshape(-1))
 
-    def get_hidden_state(self, steps, show_info=False):
+    def get_hidden_state(self, steps=800, show_info=False):
         """
         The block evolve one TR time, i.e, 800 ms as default setting.
 
@@ -366,7 +366,7 @@ class DataAssimilation(simulation):
         self.mul_property_by_subblk(self._hp_index_updating, self._hp.type_as(self.type_float).reshape(-1))
         self.get_hidden_state(steps, show_info=True)
 
-    def da_filter(self, bold_real_t, bold_sigma=1e-8, solo_rate=0.5, debug=False):
+    def da_filter(self, bold_real_t, bold_sigma=1e-6, solo_rate=0.8, debug=False):
         """
         Correct hidden_state by diffusion ensemble Kalman filter
 
@@ -426,15 +426,19 @@ class DataAssimilation(simulation):
                 np.save(os.path.join(write_path, "w_fix.npy"), w_fix)
             print("------------run da" + str(t) + ":" + str(time.time() - start_time))
         bold_assimilation = np.stack(w_save)[:, :, :, -1]
+        print(np.stack(w_save).shape)
+        hp_save_log = np.stack(w_save)[:, :, :, :-6].reshape(observation_times, self.ensemble_number, -1)
+        del w_fix, w_save
         np.save(os.path.join(write_path, "bold_assimilation.npy"), bold_assimilation)
         self.plot_bold(write_path, torch2numpy(bold_real), bold_assimilation, np.arange(10))
-        hp_save_log = numpy2torch(np.stack(w_save)[:, :, :, :self._hp_num]).reshape(observation_times,
-                                                                                    self.ensemble_number,
-                                                                                    len(self._hp_low))
-        hp_sm = torch2numpy(self.sigmoid_torch(hp_save_log, self._hp_low, self._hp_high))
+        hp_save_log = hp_save_log[:, :, torch2numpy(self.from_hidden_state)].reshape(observation_times,
+                                                                                     self.ensemble_number, -1)
+        hp_sm = self.sigmoid_torch(hp_save_log, torch2numpy(self._hp_low), torch2numpy(self._hp_high))
+        hp_sm = hp_sm.reshape(observation_times, self.ensemble_number, -1, self._hp_num)
         np.save(os.path.join(write_path, "hp_sm.npy"), hp_sm.mean(1))
         self.plot_hp(write_path, None, hp_sm, np.arange(10), self._hp_num, 'hp_sm')
-        hp_ms = torch2numpy(self.sigmoid_torch(hp_save_log.mean(1), self._hp_low, self._hp_high))
+        hp_ms = self.sigmoid_torch(hp_save_log.mean(1), torch2numpy(self._hp_low), torch2numpy(self._hp_high))
+        hp_ms = hp_ms.reshape(observation_times, -1, self._hp_num)
         np.save(os.path.join(write_path, "hp_ms.npy"), hp_ms)
         self.plot_hp(write_path, None, np.expand_dims(hp_ms, 1), np.arange(10), self._hp_num, 'hp_ms')
         self.block_model.shutdown()
