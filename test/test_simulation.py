@@ -44,7 +44,6 @@ def rest_column_simulation(args):
     model(observation_time=100, hp_index=10, hp_path=args.hp_after_da_path)
 
 
-
 if __name__ == "__main__":
     args = get_args()
     rest_column_simulation(args)

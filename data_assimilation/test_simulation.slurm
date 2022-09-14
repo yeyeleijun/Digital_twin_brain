@@ -13,17 +13,18 @@ export PYTHONPATH=$PYTHONPATH:/public/home/ssct004t/project/wenyong36/Digital_tw
 export PYTHONPATH=$PYTHONPATH:/public/home/ssct004t/project/wenyong36/Digital_twin_brain/cuda/python
 module switch compiler/rocm/4.0.1
 mpirun python3 DataAssimilation_demo.py \
-  --task='rest' \
+  --task='rest simulation' \
   --ip=11.5.4.15:50051 \
   --bold_path='/public/home/ssct004t/project/wenyong36/dti_voxel_subfeng_1e8_22703/single/rest_state_afterzscoreV2.npy' \
   --block_path='/public/home/ssct004t/project/yeleijun/Digital_twin_brain/PD-sub401/dti_distribution_100m_d100_w0_1/ensembles' \
-  --path_out='/public/home/ssct004t/project/wenyong36/Digital_twin_brain/toymodel/' \
+  --path_out='/public/home/ssct004t/project/wenyong36/Digital_twin_brain/toymodel/DTB_restfengvoxel_b36_b6_h1_a5r8104.0_4.00.530' \
   --para_ind='10' \
   --gui_real='0.00618016 8.9986715e-04 0.07027743 1.9053727e-03' \
-  --bold_sigma=1e-8 \
+  --bold_sigma=1e-6 \
   --hp_sigma=1 \
   --hp_range_rate='4 2' \
   --noise_rate=0.01\
   --ensembles=30 \
   --gui_alpha=5 \
+  --gui_path='/assimiation/hp_ms.npy'
   --label='DTB_restfengvoxel_b25_b8_h1_a5'

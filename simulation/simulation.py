@@ -257,7 +257,7 @@ class simulation(object):
             act = torch.from_numpy(act).cuda()
             bold_out = self.bold.run(torch.max(act, torch.tensor([1e-05]).type_as(act)))
         if bold_detail:
-            return act, self.bold.s, self.bold.q, self.bold.v, self.bold.f_in
+            return act, self.bold.s, self.bold.q, self.bold.v, self.bold.f_in, bold_out
         temp_freq = torch.stack([x[0] for x in total_res], dim=0)
         out = (temp_freq, )
         if vmean_option:
@@ -285,15 +285,23 @@ class simulation(object):
             total time points, equal to the time points of bold signal.
 
         """
-
+        '''
         if not hasattr(self, 'num_sample'):
             raise NotImplementedError('Please set the sampling neurons first in simulation case')
-
+        '''
         start_time = time.time()
         if hp_total is not None:
+            assert type(hp_index) == int
             self.gamma_initialize(hp_index)
             population_info = torch.stack(torch.meshgrid(self.populations, torch.tensor(hp_index, dtype=torch.int64, device="cuda:0")), dim=-1).reshape((-1, 2))
             self.block_model.mul_property_by_subblk(population_info, hp_total[0, :])
+        '''
+        if hp_total is not None:
+            population_info = torch.stack(torch.meshgrid(self.populations, torch.tensor(hp_index, dtype=torch.int64, device="cuda:0")), dim=-1).reshape((-1, 2))
+            for h in hp_index:
+                self.gamma_initialize(h)
+            self.block_model.mul_property_by_subblk(population_info, hp_total[0, :].reshape(-1))
+        '''
 
         hp_total = hp_total[1:, ]
         total_T = hp_total.shape[0]
@@ -331,7 +339,7 @@ class simulation(object):
                     Spike[j] = torch_2_numpy(out[-3])
                     Vi[j] = torch_2_numpy(out[-2])
                 bolds_out[i, :] = torch_2_numpy(out[-1])
-                t_sim_end= time.time()
+                t_sim_end = time.time()
                 print(
                     f"{i}th observation_time, max fre: {torch.max(torch.mean(out[0] / self.block_model.neurons_per_subblk.float() * 1000, dim=0)):.1f}, cost time {t_sim_end - t_sim_start:.1f}")
             if self.sample_option:
