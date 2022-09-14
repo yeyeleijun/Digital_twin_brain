@@ -8,7 +8,8 @@ import copy
 import time
 import numpy as np
 import torch
-from cuda.python.dist_blockwrapper_pytorch import BlockWrapper as block_gpu
+# from cuda.python.dist_blockwrapper_pytorch import BlockWrapper as block_gpu
+from cuda_resample0710.python.dist_blockwrapper_pytorch import BlockWrapper as block_gpu
 from models.bold_model_pytorch import BOLD
 import argparse
 import prettytable as pt
@@ -62,7 +63,8 @@ def simulate_voxel_after_assimilation_for_rest_state(block_path, ip, noise_rate,
     start_time = time.time()
     os.makedirs(write_path, exist_ok=True)
 
-    block_model = block_gpu(ip, block_path, 1., force_rebase=True)
+    # block_model = block_gpu(ip, block_path, 1., force_rebase=True)
+    block_model = block_gpu(ip, block_path, noise_rate, 1., force_rebase=True)
     bold = BOLD(epsilon=200, tao_s=0.8, tao_f=0.4, tao_0=1, alpha=0.2, E_0=0.8, V_0=0.02)
 
     populations_per_voxel = 2
@@ -85,20 +87,21 @@ def simulate_voxel_after_assimilation_for_rest_state(block_path, ip, noise_rate,
 
     re_parameter_ind = np.array([int(s) for s in re_parameter_ind.split()], dtype=np.int64).reshape(-1)
     print(f"Re_parameter_ind: {re_parameter_ind}")
-    
-    for k in re_parameter_ind:
-        population_info = np.stack(np.meshgrid(population_id, k, indexing="ij"),
-                                   axis=-1).reshape((-1, 2))
-        population_info = torch.from_numpy(population_info.astype(np.int64)).cuda()
-        alpha = torch.ones(num_populations, device="cuda:0") * 5
-        beta = torch.ones(num_populations, device="cuda:0") * 5
-        block_model.gamma_property_by_subblk(population_info, alpha, beta)
+    for i in re_parameter_ind:
+        _, _ = block_model.update_property_by_property_idx(torch.LongTensor([i]).cuda(), 5, 5)
+    # for k in re_parameter_ind:
+    #     population_info = np.stack(np.meshgrid(population_id, k, indexing="ij"),
+    #                                axis=-1).reshape((-1, 2))
+    #     population_info = torch.from_numpy(population_info.astype(np.int64)).cuda()
+    #     alpha = torch.ones(num_populations, device="cuda:0") * 5
+    #     beta = torch.ones(num_populations, device="cuda:0") * 5
+    #     block_model.gamma_property_by_subblk(population_info, alpha, beta)
 
     re_parameter_time = time.time()
     print(f"\n re_parameter have Done, Cost time {re_parameter_time - start_time:.2f} ")
 
     hp_da = np.load(os.path.join(hp_path, "hp.npy"))
-    assert hp_da.shape[1] == num_voxels
+    # assert hp_da.shape[1] == num_voxels
     hp_da = torch.from_numpy(hp_da.astype(np.float32)).cuda()
     population_info = np.stack(np.meshgrid(population_id, re_parameter_ind, indexing="ij"),
                                axis=-1).reshape((-1, 2))
@@ -118,6 +121,7 @@ def simulate_voxel_after_assimilation_for_rest_state(block_path, ip, noise_rate,
         block_model.mul_property_by_subblk(population_info, hp_da[ii, :, :].reshape(-1))
         for freqs in block_model.run(800, freqs=True, vmean=False, sample_for_show=False):
             freqs = freqs.float().cpu().numpy()
+            # freqs = freqs[0].float().cpu().numpy()
             act = np.histogram(population_id, weights=freqs, bins=num_voxels, range=(0, num_populations))[0]
             act = (act / neurons_per_voxel_cpu).reshape(-1)
             act = torch.from_numpy(act).cuda()

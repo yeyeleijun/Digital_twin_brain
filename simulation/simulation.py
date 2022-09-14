@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*- 
-# @Time : 2022/8/7 13:07 
+# -*- coding: utf-8 -*-
+# @Time : 2022/8/7 13:07
 # @Author : lepold
 # @File : simulation.py
 
@@ -18,7 +18,7 @@ from utils.sample import specified_sample
 
 class simulation(object):
     """
-    By giving the iP and block path, a simulation object is initialized.
+    By giving the IP and block path, a simulation object is initialized.
     Usually in the case: a one ensemble, i.e., one simulation ensemble.
 
     default params can be found in *params.py*,
@@ -44,7 +44,7 @@ class simulation(object):
     """
 
     @staticmethod
-    def merge_data(a, weights=None, bins=10, range=None,):
+    def merge_data(a, weights=None, bins=10, range=None, ):
         """
         merge a dataset to a desired shape. such as merge different populations to
         a voxel to calculate its size.
@@ -72,29 +72,29 @@ class simulation(object):
         """
         return np.histogram(a, weights=weights, bins=bins, range=range)[0]
 
-    def __init__(self, block_path: str, ip: str, route_path=None, column=True, **kwargs):
+    def __init__(self, ip: str, block_path: str, dt: float, route_path=None, column=True, **kwargs):
         if column:
-            self.block_model = block(ip, block_path, 1., route_path=route_path, overlap=10)
-            self.voxel_populations = 10
+            self.block_model = block(ip, block_path, dt, route_path=route_path, overlap=10)
+            self.populations_per_voxel = 10
         else:
-            self.block_model = block(ip, block_path, 1., route_path=route_path, overlap=1)
-            self.voxel_populations = 2
+            self.block_model = block(ip, block_path, dt, route_path=route_path, overlap=2)
+            self.populations_per_voxel = 2
         self.bold = BOLD(**bold_params)
-        self.populations = self.block_model.subblk_id
-        self.populations_cpu = self.populations.cpu().numpy()
+        self.population_id = self.block_model.subblk_id
+        self.population_id_cpu = self.population_id.cpu().numpy()
 
         if column:
-            self.num_voxel = int((self.populations_cpu.max() + 9) // 10)
+            self.num_voxels = int((self.population_id_cpu.max() + 9) // 10)
         else:
-            self.num_voxel = int((self.populations_cpu.max() + 1) // 2)
+            self.num_voxels = int((self.population_id_cpu.max() + 1) // 2)
+        self.num_populations = int(self.block_model.total_subblks)
+        self.num_neurons = int(self.block_model.total_neurons)
 
-        self.neurons_per_population = self.block_model.neurons_per_subblk
-        neurons_per_population = self.neurons_per_population.cpu().numpy()
-        self.neurons_per_voxel_cpu = self.merge_data(self.populations_cpu, neurons_per_population, self.num_voxel,
-                                            (0, self.num_voxel * self.voxel_populations))
-
-        self.total_populations = int(self.block_model.total_subblks)
-        self.total_neurons = int(self.block_model.total_neurons)
+        self.num_neurons_per_population = self.block_model.neurons_per_subblk
+        self.num_neurons_per_population_cpu = self.num_neurons_per_population.cpu().numpy()
+        self.num_neurons_per_voxel_cpu = self.merge_data(self.population_id_cpu, self.num_neurons_per_population_cpu,
+                                                         self.num_voxels,
+                                                         (0, self.num_voxels * self.populations_per_voxel))
 
         self.write_path = kwargs.get('write_path', "./")
         os.makedirs(self.write_path, exist_ok=True)
@@ -102,6 +102,7 @@ class simulation(object):
         self.print_info = kwargs.get("print_info", False)
         self.vmean_option = kwargs.get("vmean_option", False)
         self.sample_option = kwargs.get("sample_option", False)
+        self.imean_option = kwargs.get("imean_option", False)
 
     def clear_mode(self):
         """
@@ -112,6 +113,7 @@ class simulation(object):
         """
         self.sample_option = False
         self.vmean_option = False
+        self.imean_option = False
         self.print_info = False
 
     def update(self, hp_index, param):
@@ -132,13 +134,14 @@ class simulation(object):
         """
         print(f"update {hp_index}th attribute, to value {param:.3f}\n")
         population_info = torch.stack(
-            torch.meshgrid(self.populations, torch.tensor([hp_index], dtype=torch.int64, device="cuda:0")),
+            torch.meshgrid(self.population_id, torch.tensor([hp_index], dtype=torch.int64, device="cuda:0")),
             dim=-1).reshape((-1, 2))
-        alpha = torch.ones(self.total_populations, device="cuda:0") * param * 1e8
-        beta = torch.ones(self.total_populations, device="cuda:0") * 1e8
+        alpha = torch.ones(self.num_populations, device="cuda:0") * param * 1e8
+        beta = torch.ones(self.num_populations, device="cuda:0") * 1e8
         self.block_model.gamma_property_by_subblk(population_info, alpha, beta, debug=False)
 
-    def sample(self, aal_region, population_base, specified_info=None):
+    def sample(self, aal_region, population_base, num_sample_voxel_per_region, num_neurons_per_voxel,
+               specified_info=None):
         """
 
         set sample idx of neurons in this simulation object.
@@ -156,10 +159,12 @@ class simulation(object):
 
         sample_idx = load_if_exist(specified_sample, os.path.join(self.write_path, "sample_idx"),
                                    aal_region=aal_region,
-                                   neurons_per_population_base=population_base, specified_info=specified_info)
+                                   neurons_per_population_base=population_base,
+                                   num_sample_voxel_per_region=num_sample_voxel_per_region,
+                                   num_neurons_per_voxel=num_neurons_per_voxel, specified_info=specified_info)
         sample_idx = torch.from_numpy(sample_idx).cuda()[:, 0]
         num_sample = sample_idx.shape[0]
-        assert sample_idx.max() < self.total_neurons
+        assert sample_idx.max() < self.num_neurons
         self.block_model.set_samples(sample_idx)
         load_if_exist(lambda: self.block_model.neurons_per_subblk.cpu().numpy(),
                       os.path.join(self.write_path, "blk_size"))
@@ -184,7 +189,7 @@ class simulation(object):
         assert isinstance(value, torch.Tensor)
         self.block_model.mul_property_by_subblk(index, value)
 
-    def gamma_initialize(self, hp_index, alpha=5., beta=5.):
+    def gamma_initialize(self, population_id, hp_index, alpha=5., beta=5.):
         """
         Use a distribution of gamma(alpha, beta) to update neuronal params,
         where alpha = beta = 5.
@@ -192,7 +197,7 @@ class simulation(object):
         Parameters
         ----------
 
-        hp_index: list
+        hp_index: int
             indicate the column index among 21 attributes of LIF neuron.
 
         alpha: float, default=5.
@@ -203,13 +208,13 @@ class simulation(object):
 
         print(f"gamma_initialize {hp_index}th attribute, to value gamma({alpha}, {beta}) distribution\n")
         population_info = torch.stack(
-            torch.meshgrid(self.populations, torch.tensor(hp_index, dtype=torch.int64, device="cuda:0")),
+            torch.meshgrid(population_id, torch.tensor([hp_index], dtype=torch.int64, device="cuda:0")),
             dim=-1).reshape((-1, 2))
-        alpha = torch.ones(self.total_populations, device="cuda:0") * alpha
-        beta = torch.ones(self.total_populations, device="cuda:0") * beta
+        alpha = torch.ones(len(population_id), device="cuda:0") * alpha
+        beta = torch.ones(len(population_id), device="cuda:0") * beta
         self.block_model.gamma_property_by_subblk(population_info, alpha, beta, debug=False)
 
-    def evolve(self, step, vmean_option=False, sample_option=True, bold_detail=False) -> tuple:
+    def evolve(self, step, vmean_option=False, sample_option=False, imean_option=False, bold_detail=False) -> tuple:
         """
 
         The block evolve one TR time, i.e, 800 ms as default setting.
@@ -219,11 +224,14 @@ class simulation(object):
         step: int, default=800
             iter number in one observation time point.
 
-        sample_option: bool, default=True
+        sample_option: bool, default=False
             if True, block.run will contain freqs statistics, Tensor: shape=(num_populations, ).
 
         vmean_option: bool, default=False
             if True, block.run will contain vmean statistics, Tensor: shape=(num_populations, ).
+
+        imean_option: bool, default=False
+            if True, block.run will contain imean statistics, Tensor: shape=(num_populations, ).
 
         Returns
         ----------
@@ -233,43 +241,53 @@ class simulation(object):
         vmean: torch.Tensor
             average membrane potential of different populations, shape=(step, num_populations).
 
-        sample_spike:: torch.Tensor
+        sample_spike: torch.Tensor
             the spike of sample neurons, shape=(step, num_sample_voxels).
+
         sample_v: torch.Tensor
             the membrane potential of sample neurons, shape=(step, num_sample_voxels).
+
+        vmean: torch.Tensor
+            average of synaptic current of different populations, shape=(step, num_populations).
+
         bold_out: torch.Tensor
             the bold out of voxels at the last step in one observation time poitn, shape=(num_voxels).
 
             .. versionadded:: 1.0
 
         """
-        # self.vmean_option = vmean_option
-        # self.sample_option = sample_option
         total_res = []
 
-        for return_info in self.block_model.run(step, freqs=True, vmean=vmean_option, sample_for_show=sample_option):
+        for return_info in self.block_model.run(step, freqs=True, vmean=vmean_option, sample_for_show=sample_option,
+                                                imean=imean_option):
             Freqs, *others = return_info
             total_res.append(return_info)
 
             freqs = Freqs.cpu().numpy()
-            act = self.merge_data(self.populations_cpu, freqs, self.num_voxel, (0, self.num_voxel * self.voxel_populations))
-            act = (act / self.neurons_per_voxel_cpu).reshape(-1)
+            act = self.merge_data(self.population_id_cpu, freqs, self.num_voxels,
+                                  (0, self.num_voxels * self.populations_per_voxel))
+            act = (act / self.num_neurons_per_voxel_cpu).reshape(-1)
             act = torch.from_numpy(act).cuda()
             bold_out = self.bold.run(torch.max(act, torch.tensor([1e-05]).type_as(act)))
+        if bold_detail:
+            return act, self.bold.s, self.bold.q, self.bold.v, self.bold.f_in
         temp_freq = torch.stack([x[0] for x in total_res], dim=0)
-        out = (temp_freq, )
+        out = (temp_freq,)
+        out_base = 1
         if vmean_option:
             temp_vmean = torch.stack([x[1] for x in total_res], dim=0)
-            out += (temp_vmean, )
+            out += (temp_vmean,)
+            out_base += 1
         if sample_option:
-            temp_vsamle = torch.stack([x[3] for x in total_res], dim=0)
-            temp_spike = torch.stack([x[2] for x in total_res], dim=0)
-            temp_spike &= (torch.abs(temp_vsamle - v_th) / 50 < 1e-5)
-            out += (temp_spike, temp_vsamle, )
-        if not bold_detail:
-            out += (bold_out, )
-        else:
-            out = (out[0][-1], self.bold.s, self.bold.q, self.bold.v, self.bold.f_in, bold_out, )
+            temp_vsample = torch.stack([x[out_base] for x in total_res], dim=0)
+            temp_spike = torch.stack([x[out_base + 1] for x in total_res], dim=0)
+            temp_spike &= (torch.abs(temp_vsample - v_th) / 50 < 1e-5)
+            out += (temp_spike, temp_vsample,)
+            out_base += 2
+        if imean_option:
+            temp_imean = torch.stack([x[out_base] for x in total_res], dim=0)
+            out += (temp_imean,)
+        out += (bold_out,)
         return out
 
     def run(self, step=800, observation_time=100, hp_index=None, hp_total=None):
@@ -291,32 +309,41 @@ class simulation(object):
 
         start_time = time.time()
         if hp_total is not None:
-            self.gamma_initialize(hp_index)
-            population_info = torch.stack(torch.meshgrid(self.populations, torch.tensor(hp_index, dtype=torch.int64, device="cuda:0")), dim=-1).reshape((-1, 2))
+            state = "after"
+            self.gamma_initialize(self.population_id, hp_index)
+            population_info = torch.stack(
+                torch.meshgrid(self.population_id, torch.tensor(hp_index, dtype=torch.int64, device="cuda:0")),
+                dim=-1).reshape((-1, 2))
             self.block_model.mul_property_by_subblk(population_info, hp_total[0, :])
+            hp_total = hp_total[1:, ]
+            total_T = hp_total.shape[0]
+            assert observation_time <= total_T
+        else:
+            state = "before"
+            total_T = None
 
-        hp_total = hp_total[1:, ]
-        total_T = hp_total.shape[0]
-        assert observation_time <= total_T
         freqs, _ = self.evolve(3200, vmean_option=False, sample_option=False)
         Init_end = time.time()
         if self.print_info:
-            print(f"max fre: {torch.max(torch.mean(freqs / self.block_model.neurons_per_subblk.float() * 1000, dim=0)):.1f}")
+            print(
+                f"max fre: {torch.max(torch.mean(freqs / self.block_model.neurons_per_subblk.float() * 1000, dim=0)):.1f}")
         pretty_print(f"Init have Done, cost time {Init_end - start_time:.2f}")
 
         pretty_print("Begin Simulation")
         print(f"Total time is {total_T}, we only simulate {observation_time}\n")
 
-        bolds_out = np.zeros([observation_time, self.num_voxel], dtype=np.float32)
+        bolds_out = np.zeros([observation_time, self.num_voxels], dtype=np.float32)
         for ii in range((observation_time - 1) // 50 + 1):
             nj = min(observation_time - ii * 50, 50)
-            FFreqs = np.zeros([nj, step, self.total_populations], dtype=np.uint32)
+            FFreqs = np.zeros([nj, step, self.num_populations], dtype=np.uint32)
             # Noise_Spike = np.zeros([nj, step, self.num_sample], dtype=np.uint8)
             if self.vmean_option:
-                Vmean = np.zeros([nj, step, self.total_populations], dtype=np.float32)
+                Vmean = np.zeros([nj, step, self.num_populations], dtype=np.float32)
             if self.sample_option:
                 Spike = np.zeros([nj, step, self.num_sample], dtype=np.uint8)
                 Vi = np.zeros([nj, step, self.num_sample], dtype=np.float32)
+            if self.imean_option:
+                Imean = np.zeros([nj, step, self.num_populations], dtype=np.float32)
 
             for j in range(nj):
                 i = ii * 50 + j
@@ -325,22 +352,30 @@ class simulation(object):
                     self.block_model.mul_property_by_subblk(population_info, hp_total[i, :])
                 out = self.evolve(step, vmean_option=self.vmean_option, sample_option=self.sample_option)
                 FFreqs[j] = torch_2_numpy(out[0])
+                out_base = 1
                 if self.vmean_option:
-                    Vmean[j] = torch_2_numpy(out[1])
+                    Vmean[j] = torch_2_numpy(out[out_base])
+                    out_base += 1
                 if self.sample_option:
-                    Spike[j] = torch_2_numpy(out[-3])
-                    Vi[j] = Spike[j] = torch_2_numpy(out[-2])
+                    Spike[j] = torch_2_numpy(out[out_base])
+                    Vi[j] = Spike[j] = torch_2_numpy(out[out_base + 1])
+                    out_base += 2
+                if self.imean_option:
+                    Imean[i] = torch_2_numpy(out[out_base])
+
                 bolds_out[i, :] = torch_2_numpy(out[-1])
-                t_sim_end= time.time()
+                t_sim_end = time.time()
                 print(
                     f"{i}th observation_time, max fre: {torch.max(torch.mean(out[0] / self.block_model.neurons_per_subblk.float() * 1000, dim=0)):.1f}, cost time {t_sim_end - t_sim_start:.1f}")
             if self.sample_option:
-                np.save(os.path.join(self.write_path, "spike_after_assim_{}.npy".format(ii)), Spike)
-                np.save(os.path.join(self.write_path, "vi_after_assim_{}.npy".format(ii)), Vi)
+                np.save(os.path.join(self.write_path, f"spike_{state}_assim_{ii}.npy"), Spike)
+                np.save(os.path.join(self.write_path, f"vi_{state}_assim_{ii}.npy"), Vi)
             if self.vmean_option:
-                np.save(os.path.join(self.write_path, "vmean_after_assim_{}.npy".format(ii)), Vmean)
-            np.save(os.path.join(self.write_path, "freqs_after_assim_{}.npy".format(ii)), FFreqs)
-        np.save(os.path.join(self.write_path, "bold_after_assim.npy"), bolds_out)
+                np.save(os.path.join(self.write_path, f"vmean_{state}_assim_{ii}.npy"), Vmean)
+            if self.imean_option:
+                np.save(os.path.join(self.write_path, f"imean_{state}_assim_{ii}.npy"), Imean)
+            np.save(os.path.join(self.write_path, f"freqs_{state}_assim_{ii}.npy"), FFreqs)
+            np.save(os.path.join(self.write_path, f"bold_{state}_assim.npy"), bolds_out)
 
         pretty_print(f"Totally have Done, Cost time {time.time() - start_time:.2f} ")
 
@@ -351,7 +386,7 @@ class simulation(object):
         Parameters
         ----------
 
-        hp_index: list, default is None.
+        hp_index: int, default is None.
 
         hp_path: str, default is None.
 
@@ -364,15 +399,15 @@ class simulation(object):
 
         """
 
-        info = {'name': self.name, "num_neurons": self.total_neurons, 'num_voxel': self.num_voxel,
-                'num_populations': self.total_populations}
+        info = {'name': self.name, "num_neurons": self.num_neurons, 'num_voxel': self.num_voxels,
+                'num_populations': self.num_populations}
         table_print(info)
         if hp_path is not None:
             hp_total = np.load(hp_path)
-            assert hp_total.shape[1] == self.total_populations
+            assert hp_total.shape[1] == self.num_populations
             hp_total = torch.from_numpy(hp_total.astype(np.float32)).cuda()
-            self.run(step=800, observation_time=100, hp_index=hp_index, hp_total=hp_total)
+            self.run(step=step, observation_time=observation_time, hp_index=hp_index, hp_total=hp_total)
         else:
-            self.run(step=800, observation_time=100, hp_index=None, hp_total=None)
+            self.run(step=step, observation_time=observation_time, hp_index=None, hp_total=None)
 
         self.block_model.shutdown()

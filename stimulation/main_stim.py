@@ -4,7 +4,8 @@
 # @Author  : Leijun Ye
 
 import argparse
-from stimulation import *
+# from stimulation import *
+from stimulation_old import *
 import numpy as np
 
 parser = argparse.ArgumentParser(description="PyTorch Stimulation")
@@ -31,11 +32,14 @@ kwargs = {"name": "test_simulation",
           "sample_option": args.sample_option,
           "imean_option": args.imean_option}
 
-# simulation_voxel = StimulationVoxel(args.ip, args.block_path, args.dt, route_path=None, **kwargs)
-# simulation_voxel(step=args.step, observation_time=args.observation_time, hp_path=args.hp_path, hp_index=hp_index, whole_brain_info=args.whole_brain_info)
+if not args.hp_path:
+    args.hp_path = None
 
-simulation_voxel_critical = SimulationVoxelCritical(args.ip, args.block_path, args.dt, route_path=None, **kwargs)
-simulation_voxel_critical(step=args.step, observation_time=args.observation_time, hp_path=args.hp_path, hp_index=hp_index, whole_brain_info=args.whole_brain_info)
+simulation_voxel = SimulationVoxel(args.ip, args.block_path, args.dt, route_path=None, column=False, **kwargs)
+simulation_voxel(step=args.step, observation_time=args.observation_time, hp_path=args.hp_path, hp_index=hp_index, whole_brain_info=args.whole_brain_info)
 
-# stimulation_voxel = StimulationVoxel(args.ip, args.block_path, args.dt, route_path=None, **kwargs)
+# simulation_voxel_critical = SimulationVoxelCritical(args.ip, args.block_path, args.dt, route_path=None, column=False, **kwargs)
+# simulation_voxel_critical(step=args.step, observation_time=args.observation_time, hp_path=args.hp_path, hp_index=hp_index, whole_brain_info=args.whole_brain_info)
+
+# stimulation_voxel = StimulationVoxel(args.ip, args.block_path, args.dt, route_path=None, column=False, **kwargs)
 # stimulation_voxel.run(step=args.step, observation_time=args.observation_time, hp_path=args.hp_path, hp_index=hp_index, whole_brain_info=args.whole_brain_info)

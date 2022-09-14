@@ -356,6 +356,7 @@ class DA_Rest_Whole_Brain_Voxel(DA_MODEL):
             w_save[:, :, :, :self.hp_num].reshape(self.T * self.ensembles, self.num_voxel_in_one_ensemble, self.hp_num),
             self.torch_2_numpy(self.low_bound), self.torch_2_numpy(self.up_bound))
         hp = hp_save.reshape(self.T, self.ensembles, self.num_voxel_in_one_ensemble, self.hp_num).mean(axis=1)
+        hp = hp.reshape([self.T, self.num_populations_in_one_ensemble, -1])
         np.save(os.path.join(write_path, "hp.npy"), hp)
         self.show_hp(
             hp_save.reshape(self.T, self.ensembles, self.num_voxel_in_one_ensemble, self.hp_num),

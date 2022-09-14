@@ -241,7 +241,7 @@ def specified_sample(aal_region, neurons_per_population_base, specified_info=Non
 
 
 def sample_voxel(aal_region, neurons_per_population_base, num_sample_voxel_per_region=1,
-                                       num_neurons_per_voxel=300):
+                                       num_neurons_per_voxel=300, specified_info=None):
     """
     For DTB of voxel version, more convenient version to sample neurons for ``stimulation`` object.
 
