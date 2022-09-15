@@ -13,8 +13,8 @@ module rm compiler/rocm/2.9
 module rm compiler/rocm/3.9
 module rm compiler/rocm/3.5
 module add compiler/cmake/3.15.6
-#module add compiler/rocm/4.0.1
-module add compiler/rocm/dtk-22.04.2
+module add compiler/rocm/4.0.1
+#module add compiler/rocm/dtk-22.04.2
 module list
 ./gencode.sh
 cd 3rdparty/jsoncpp
