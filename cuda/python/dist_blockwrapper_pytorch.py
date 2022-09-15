@@ -460,7 +460,7 @@ class BlockWrapper:
                                         "gamma_rate": _gamma_rate}
 
         if not debug:
-            self._update_property_by_subblk(property_idx, gamma_hp, process_hp, generate_request, self._stub.Updategamma)
+            return self._update_property_by_subblk(property_idx, gamma_hp, process_hp, generate_request, self._stub.Updategamma)
         else:
             response = self._update_property_by_subblk(property_idx, gamma_hp, process_hp, generate_request, self._stub.Updategammawithresult)
             for r in response:
@@ -478,6 +478,7 @@ class BlockWrapper:
                 mean_error = abs(val.mean() - alpha/beta)/(alpha/beta)
                 var_error = abs(val.var() - alpha/beta ** 2)/(alpha/beta ** 2)
                 print("bid: {}, brain_id: {}, prop_id: {}, mean_err: {:.2f}, var_err: {:.2f}".format(bid, brain_id, prop_id, mean_error, var_error))
+            return True
 
     def set_samples(self, sample_idx, bid=None):
         assert isinstance(sample_idx, torch.Tensor)

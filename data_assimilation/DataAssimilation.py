@@ -312,12 +312,12 @@ class DataAssimilation(simulation):
 
         """
         for p in property_index:
-            self.gamma_initialize(self.population_id, p, alpha, alpha)
+            self.gamma_initialize(p, alpha=alpha, beta=alpha)
         self._property_index = torch.tensor(property_index).type_as(self.type_int).reshape(-1)
         # index_da_population could be optimized
         index_da_population = self.population_id if index_da_population is None else index_da_population
         self._hp_index_updating = torch.stack((torch.meshgrid(index_da_population, self._property_index)),
-                                              dim=1).reshape(-1, 2).type_as(self.type_int)
+                                              dim=-1).reshape(-1, 2).type_as(self.type_int)
         print(self._hp_index_updating, self._hp_index_updating[:, 1], self._hp_index_updating[:, 0], gui.shape)
         self.mul_property_by_subblk(self._hp_index_updating, gui.type_as(self.type_float).reshape(-1))
 
