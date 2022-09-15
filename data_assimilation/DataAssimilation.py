@@ -69,7 +69,7 @@ class DataAssimilation(simulation):
 
     """
 
-    def __init__(self, block_path: str, ip: str, route_path=None, column=True, **kwargs):
+    def __init__(self, block_path: str, ip: str, dt=1, route_path=None, column=True, **kwargs):
         """
         By giving the iP and block path, a DataAssimilation object is initialized.
         Usually in the case: 100 ensemble, i.e., 100 simulation ensemble.
@@ -92,9 +92,9 @@ class DataAssimilation(simulation):
         kwargs: other positional params which are specified.
 
         """
-        super(DataAssimilation, self).__init__(block_path, ip, route_path, column, **kwargs)
+        super(DataAssimilation, self).__init__(ip, block_path, dt, route_path, column, **kwargs)
         self._ensemble_number = kwargs.get("ensemble", 100)
-        assert (self.total_neurons % self._ensemble_number == 0)
+        assert (self.num_neurons % self._ensemble_number == 0)
         self._hidden_state = None
         self._property_index = None
         self._index_da_voxel_pblk = None  # for bold single
@@ -187,19 +187,19 @@ class DataAssimilation(simulation):
 
     @property
     def _num_populations_pblk(self):
-        return int(self.total_populations // self._ensemble_number)
+        return int(self.num_populations // self._ensemble_number)
 
     @property
     def _num_voxel_pblk(self):
-        return int(self.num_voxel // self.ensemble_number)
+        return int(self.num_voxels // self.ensemble_number)
 
     @property
     def type_int(self):
-        return torch.tensor([0]).type_as(self.populations).type(torch.int64)
+        return torch.tensor([0]).type_as(self.population_id).type(torch.int64)
 
     @property
     def type_float(self):
-        return torch.tensor([0]).type_as(self.populations).type(torch.float32)
+        return torch.tensor([0]).type_as(self.population_id).type(torch.float32)
 
     def hp_random_initialize(self, gui_low_ppopu, gui_high_ppopu, num_da_populations_pblk=None, gui_pblk=False):
         """
@@ -312,10 +312,10 @@ class DataAssimilation(simulation):
 
         """
         for p in property_index:
-            self.gamma_initialize(p, alpha, alpha)
+            self.gamma_initialize(self.population_id, p, alpha, alpha)
         self._property_index = torch.tensor(property_index).type_as(self.type_int).reshape(-1)
         # index_da_population could be optimized
-        index_da_population = self.populations if index_da_population is None else index_da_population
+        index_da_population = self.population_id if index_da_population is None else index_da_population
         self._hp_index_updating = torch.stack((torch.meshgrid(index_da_population, self._property_index)),
                                               dim=1).reshape(-1, 2).type_as(self.type_int)
         print(self._hp_index_updating, self._hp_index_updating[:, 1], self._hp_index_updating[:, 0], gui.shape)

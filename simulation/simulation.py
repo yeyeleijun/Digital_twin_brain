@@ -189,7 +189,7 @@ class simulation(object):
         assert isinstance(value, torch.Tensor)
         self.block_model.mul_property_by_subblk(index, value)
 
-    def gamma_initialize(self, population_id, hp_index, alpha=5., beta=5.):
+    def gamma_initialize(self, hp_index, population_id, alpha=5., beta=5.):
         """
         Use a distribution of gamma(alpha, beta) to update neuronal params,
         where alpha = beta = 5.
@@ -311,7 +311,7 @@ class simulation(object):
         if hp_total is not None:
             state = "after"
             for k in hp_index:
-                self.gamma_initialize(self.population_id, k)
+                self.gamma_initialize(k, self.population_id)
             population_info = torch.stack(
                 torch.meshgrid(self.population_id, torch.tensor(hp_index, dtype=torch.int64, device="cuda:0")),
                 dim=-1).reshape((-1, 2))
