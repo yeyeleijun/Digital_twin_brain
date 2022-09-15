@@ -90,7 +90,7 @@ def rest_simulation(args):
     hp_after_da = np.load(args.path_out + args.gui_path)
     observation_time, num_da_population_pblk, hp_num = hp_after_da.shape
     print(observation_time, num_da_population_pblk, hp_num)
-    da_simulation = simulation(args.block_path, args.ip, column=False, print_info=True, write_path=path_out)
+    da_simulation = simulation(args.ip, args.block_path, dt=1, column=False, print_info=True, write_path=path_out)
     da_simulation.clear_mode()
     hp_after_da = torch.from_numpy(hp_after_da.astype(np.float32)).cuda()[:, :, 0]
     da_simulation.run(step=800, observation_time=observation_time-1, hp_index=10, hp_total=hp_after_da)
