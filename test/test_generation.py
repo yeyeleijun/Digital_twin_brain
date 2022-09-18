@@ -2,20 +2,89 @@
 # @Time : 2022/8/10 14:31 
 # @Author : lepold
 # @File : test_generation.py
-
-
+import os
 import unittest
 import h5py
 from mpi4py import MPI
 import numpy as np
-
 from generation.make_block import *
 import sparse
 
 
 class TestBlock(unittest.TestCase):
     @staticmethod
+    def _make_directory_tree(root_path, scale, degree, init_min, init_max, extra_info):
+        """
+        make directory tree for each subject.
+
+        Parameters
+        ----------
+        root_path: str
+            each subject has a root path.
+
+        scale: int
+            number of neurons of whole brain.
+        degree:
+            in-degree of each neuron.
+
+        init_min: float
+            the lower bound of uniform distribution where w is sampled from.
+
+        init_max: float
+            the upper bound of uniform distribution where w is sampled from.
+
+        extra_info: str
+            supplementary information.
+
+        Returns
+        ----------
+        second_path: str
+            second path to save connection table
+
+        """
+        os.makedirs(root_path, exist_ok=True)
+        os.makedirs(os.path.join(root_path, "raw_data"), exist_ok=True)
+        second_path = os.path.join(root_path,
+                                   f"dti_distribution_{int(scale // 1e6)}m_d{int(degree)}_w{init_min}_{init_max}_{extra_info}")
+        os.makedirs(second_path, exist_ok=True)
+        os.makedirs(os.path.join(second_path, "single"), exist_ok=True)
+        os.makedirs(os.path.join(second_path, "ensembles"), exist_ok=True)
+        os.makedirs(os.path.join(second_path, "supplementary_info"), exist_ok=True)
+        os.makedirs(os.path.join(second_path, "DA"), exist_ok=True)
+
+        return second_path
+
+    @staticmethod
     def _add_laminar_cortex_model(conn_prob, gm, canonical_voxel=False):
+        """
+        Process the connection probability matrix, grey matter and degree scale for DTB with pure voxel and micro-column
+        structure.  Each voxel is split into 2 populations (E and I). Each micro-column is spilt into 10 populations
+        (L1E, L1I, L2/3E, L2/3I, L4E, L4I, L5E, L5I, L6E, L6I).
+
+        Parameters
+        ----------
+        conn_prob: numpy.ndarray, shape [N, N]
+            the connectivity probability matrix between N voxels/micro-columns.
+
+        gm: numpy.ndarray, shape [N]
+            the normalized grey matter in each voxel/micro-column.
+
+        canonical_voxel: bool
+            Ture for voxel structure; False for micro-column structure.
+
+        Returns
+        -------
+        out_conn_prob: numpy.ndarray
+            connectivity probability matrix between populations (shape [2*N, 2*N] for voxel; shape[10*N, 10*N] for micro
+            -column) in the sparse matrix form.
+
+        out_gm: numpy.ndarray
+            grey matter for populations in DTB (shape [2*N] for voxel; shape[10*N] for micro-column).
+
+        out_degree_scale: numpy.ndarray
+            scale of degree for populations in DTB (shape [2*N] for voxel; shape[10*N] for micro-column).
+
+        """
         if not canonical_voxel:
             lcm_connect_prob = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -35,9 +104,12 @@ class TestBlock(unittest.TestCase):
                                7.6 * 82, 7.6 * 18,
                                22.1 * 83, 22.1 * 17], dtype=np.float64)  # ignore the L1 neurons
         else:
-            # 4:1 setting
-            lcm_connect_prob = np.array([[4/7, 1/7, 2/7],
-                                         [4/7, 1/7, 2/7]], dtype=np.float64)
+            # 4:1 setting, setting from wenyong
+            # lcm_connect_prob = np.array([[0.3, 0.2, 0.5],
+            #                              [0.3, 0.2, 0.5]], dtype=np.float64)
+            # 4:1 setting, setting inferred from micro-column
+            lcm_connect_prob = np.array([[4 / 7, 1 / 7, 2 / 7],
+                                         [4 / 7, 1 / 7, 2 / 7]], dtype=np.float64)
             lcm_gm = np.array([0.8, 0.2], dtype=np.float64)
 
         lcm_gm /= lcm_gm.sum()
@@ -106,7 +178,7 @@ class TestBlock(unittest.TestCase):
                                      [0, 0, 80, 8, 92, 3, 159, 11, 76, 499, 1794]], dtype=np.float64
                                     )
 
-        # wenyong setting（0.3， 0.3, 0.5), cortical colulmn is（4/7， 1/7， 2/7）
+        # wenyong setting (0.3, 0.2, 0.5), cortical column is (4/7, 1/7, 2/7)
         lcm_connect_prob_subcortical = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                                  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                                  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -233,8 +305,9 @@ class TestBlock(unittest.TestCase):
             out_conn_prob = out_conn_prob / out_conn_prob.sum(axis=1, keepdims=True)
         return out_conn_prob, out_gm, out_degree_scale
 
-    def _test_make_small_block(self, write_path, initial_parameter=(0.00495148, 0.0009899, 0.08417509, 0.00458287)):
-        prob = torch.tensor([[0.8, 0.2], [0.2, 0.8]])
+    def _test_make_small_block(self, write_path="../small_blocks",
+                              initial_parameter=(0.00495148, 0.0009899, 0.08417509, 0.00458287)):
+        prob = torch.tensor([[0.8, 0.2], [0.8, 0.2]])
         tau_ui = (2, 40, 10, 50)
         population_kwards = [{'g_Li': 0.03,
                               'g_ui': initial_parameter,
@@ -247,11 +320,11 @@ class TestBlock(unittest.TestCase):
         print("Done")
 
     def _test_make_whole_brain_include_cortical_laminar_and_subcortical_voxel_model(self,
-                                                                                   path="./laminar_structure_whole_brain_include_subcortical/200m_structure_d100",
-                                                                                   degree=100,
-                                                                                   minmum_neurons_for_block=0,
-                                                                                   scale=int(2e8),
-                                                                                   blocks=40):
+                                                                                    path="./laminar_structure_whole_brain_include_subcortical/200m_structure_d100",
+                                                                                    degree=100,
+                                                                                    minmum_neurons_for_block=0,
+                                                                                    scale=int(2e8),
+                                                                                    blocks=40):
         """
         generate the whole brian connection table at the cortical-column version, and generate index file of populations.
         In simulation, we can use the population_base.npy to sample which neurons we need to track.
@@ -311,7 +384,7 @@ class TestBlock(unittest.TestCase):
                    }
                   for i, b in enumerate(block_size)]
 
-        population_base = np.array([kword['size'] for kword in kwords], dtype=np.uint8)
+        population_base = np.array([kword['size'] for kword in kwords], dtype=np.int64)
         population_base = np.add.accumulate(population_base)
         population_base = np.insert(population_base, 0, 0)
         os.makedirs(os.path.join(path, 'supplementary_info'), exist_ok=True)
@@ -332,17 +405,15 @@ class TestBlock(unittest.TestCase):
                                            dtype="single",
                                            debug_block_dir=None)
 
-    def test_generate_normal_voxel_whole_brain(self, path="./data/jianfeng_normal", degree=100,
+    def test_generate_normal_voxel_whole_brain(self,
+                                                root_path="/public/home/ssct004t/project/yeleijun/Digital_twin_brain/PD-sub401",
+                                                degree=100,
                                                 minimum_neurons_for_block=(200, 50),
-                                                scale=int(1e8)):
+                                                scale=int(1e8), init_min=1, init_max=1):
+        second_path = self._make_directory_tree(root_path, scale, degree, init_min, init_max, "critical")
         blocks = int(scale / 5e6)
-        print(f"merge to {blocks} blocks")
-        # TODO: Requirements: 1. (xiechao) sort out the data format, such as DTI, T1_ weight
-        # TODO: 2. (xiechao) Add a list to indicate the category of all voxels (cortical or subcortical)
-        # TODO: 3. (leopold) read the category and save as npy file in 'data_dir/supplementary_info/'
-        file = h5py.File(
-            '/public/home/ssct004t/project/yeleijun/spiking_nn_for_brain_simulation/data/jianfeng_normal/A1_1_DTI_voxel_structure_data_jianfeng.mat',
-            'r')
+        print(f"Total {scale} neurons for DTB, merge to {blocks} blocks")
+        file = h5py.File(os.path.join(root_path, "raw_data", "DTI_voxel_network_PD_STN4mm_sub-PD401_info.mat"), 'r')
         block_size = file['dti_grey_matter'][0]
         dti = np.float32(file['dti_net_full'])
 
@@ -359,35 +430,35 @@ class TestBlock(unittest.TestCase):
         conn_prob /= conn_prob.sum(axis=1, keepdims=True)
         conn_prob, block_size, degree_scale = self._add_laminar_cortex_model(conn_prob, block_size,
                                                                              canonical_voxel=True)
-
-        gui = np.array([0.01935443, 0.00052911, 0.09493671, 0.02250352], dtype=np.float64)  # find in sub critical in 3hz noise rate and 0.1ms iteration resolution.
+        # gui = np.array([6.1644921e-03, 8.9986715e-04, 2.9690875e-02, 1.9053727e-03], dtype=np.float64) # old setting, noise rate=0.01, totally steady spike, 1ms iteration
+        gui = np.array([0.01837975, 0.00072405, 0.10759494, 0.02180028],
+                       dtype=np.float64)  # find in sub critical in 3hz noise rate and 0.1ms iteration resolution.
         degree = np.maximum((degree * degree_scale).astype(np.uint16), 1)
 
         kwords = [{"V_th": -50,
                    "V_reset": -65,
                    'g_Li': 0.03,
                    'g_ui': gui,
-                   'tao_ui': (2, 40, 10, 50),
-                   'noise_rate': 0.0003,
+                   'tao_ui': (8, 40, 10, 50),  # old setting: [2, 40, 10, 50]
+                   'noise_rate': 0.003,  # old setting: 0.01 Hz
                    "size": int(max(b * scale, minimum_neurons_for_block[i % 2]))}
                   for i, b in enumerate(block_size)]
 
-        population_base = np.array([kword['size'] for kword in kwords], dtype=np.uint8)
+        population_base = np.array([kword['size'] for kword in kwords], dtype=np.int64)
         population_base = np.add.accumulate(population_base)
         population_base = np.insert(population_base, 0, 0)
-        os.makedirs(os.path.join(path, 'supplementary_info'), exist_ok=True)
-        np.save(os.path.join(path, 'supplementary_info', "population_base.npy"), population_base)
+        np.save(os.path.join(second_path, "supplementary_info", "population_base.npy"), population_base)
 
         conn = connect_for_multi_sparse_block(conn_prob, kwords,
                                               degree=degree,
-                                              init_min=1,  # have modified as in the criticalNN experiment.
-                                              init_max=1)
+                                              init_min=init_min,  # have modified as in the criticalNN experiment.
+                                              init_max=init_max)
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
         size = comm.Get_size()
 
         for i in range(rank, blocks, size):
-            merge_dti_distributation_block(conn, path,
+            merge_dti_distributation_block(conn, second_path,
                                            MPI_rank=i,
                                            number=blocks,
                                            dtype="single",

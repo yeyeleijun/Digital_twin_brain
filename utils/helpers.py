@@ -12,6 +12,7 @@ Here are some simple Numpy functions or torch functions that help to achieve sim
 import os
 import torch
 import numpy as np
+import argparse
 
 
 def np_move_avg(a, n=10, mode="valid"):
@@ -64,3 +65,14 @@ def load_if_exist(func, *args, **kwargs):
         out = func(**kwargs)
         np.save(path, out)
     return out
+
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Boolean value expected.")
