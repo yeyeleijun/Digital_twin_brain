@@ -366,7 +366,7 @@ class DataAssimilation(simulation):
         self.mul_property_by_subblk(self._hp_index_updating, self._hp.type_as(self.type_float).reshape(-1))
         self.get_hidden_state(steps, show_info=True)
 
-    def da_filter(self, bold_real_t, bold_sigma=1e-6, solo_rate=0.8, debug=False):
+    def da_filter(self, bold_real_t, bold_sigma=1e-6, solo_rate=0.8, debug=False, bound=None):
         """
         Correct hidden_state by diffusion ensemble Kalman filter
 
@@ -382,6 +382,9 @@ class DataAssimilation(simulation):
         debug: bool, default=False
             Return hidden_state to debug if debug is true
 
+        bound: int, default=40
+            trail
+
         """
         if debug:
             self._hidden_state, w_debug = diffusion_enkf(self._hidden_state, bold_sigma, bold_real_t, solo_rate, debug)
@@ -389,6 +392,8 @@ class DataAssimilation(simulation):
         else:
             self._hidden_state = diffusion_enkf(self._hidden_state, bold_sigma, bold_real_t, solo_rate)
         self._hp_log = self._hidden_state[:, :, :-6].reshape(self.ensemble_number, -1)[:, self.from_hidden_state]
+        if bound is not None:
+            self._hp_log = torch.clamp(self._hp_log, -bound, bound)
         self.bold.state_update(self._hidden_state[:, :, -5:-1])
 
     def da_rest_run(self, bold_real, write_path, observation_times=None):

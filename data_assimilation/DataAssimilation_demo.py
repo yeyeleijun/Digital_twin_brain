@@ -70,7 +70,8 @@ def rest_voxel(args):
     da_gui = da_rest.hp_random_initialize(gui_low, gui_high, gui_pblk=True)
     da_rest.hp_index2hidden_state()
     da_rest.da_property_initialize(property_index, args.gui_alpha, da_gui)
-    da_rest.get_hidden_state()
+    for _ in range(5):
+        da_rest.get_hidden_state()
     # da_rest run
     bold_real = torch.cat((bold_real, bold_real[:, :296]), dim=1)
     da_rest.da_rest_run(bold_real, path_out)
@@ -129,13 +130,15 @@ def rest_simulation(args):
     os.makedirs(path_out, exist_ok=True)
     os.makedirs(path_out + 'figure/', exist_ok=True)
     bold_real = get_bold_signal(args.bold_path, b_min=0.02, b_max=0.05, lag=0)
-    hp_after_da = np.load(args.path_out + args.gui_path)
-    observation_time, num_da_population_pblk, hp_num = hp_after_da.shape
-    print(observation_time, num_da_population_pblk, hp_num)
     da_simulation = simulation(args.ip, args.block_path, dt=1, column=False, print_info=True, write_path=path_out)
     da_simulation.clear_mode()
-    hp_after_da = torch.from_numpy(hp_after_da.astype(np.float32)).cuda()[:, :, 0]
-    da_simulation.run(step=800, observation_time=observation_time-1, hp_index=10, hp_total=hp_after_da)
+    # hp_after_da = np.load(args.path_out + args.gui_path)
+    hp_after_da = np.array([float(s) for s in args.gui_real.split()]).reshape(-1)
+    hp_after_da = np.tile(hp_after_da, [50, da_simulation.num_populations, 1])[:, :, property_index-10]
+    observation_time, num_da_population_pblk, hp_num = hp_after_da.shape
+    print(observation_time, num_da_population_pblk, hp_num)
+    hp_after_da = torch.from_numpy(hp_after_da.astype(np.float32)).cuda()
+    da_simulation.run(step=800, observation_time=observation_time-1, hp_index=property_index, hp_total=hp_after_da)
     da_simulation.block_model.shutdown()
 
 
