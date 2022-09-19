@@ -238,10 +238,11 @@ class DataAssimilation(simulation):
         self._hp_high = gui_high_ppopu.reshape(-1).type_as(self.type_float)
         # method 1
         self._hp_log = torch.linspace(-20, 20, self.ensemble_number).repeat_interleave(len(self._hp_low))
-        self._hp_log = self._hp_log.type_as(self.type_float).reshape(self.ensemble_number, -1)
-        for i in range(len(self._hp_low)):
+        self._hp_log = self._hp_log.type_as(self.type_float).reshape(self.ensemble_number, -1, self._hp_num)
+        for i in range(self._hp_num):
             idx = np.random.choice(self.ensemble_number, self.ensemble_number, replace=False)
-            self._hp_log[:, i] = self._hp_log[idx, i]
+            self._hp_log[:, :, i] = self._hp_log[idx, :, i]
+        self._hp_log = self._hp_log.reshape(self.ensemble_number, -1)
         # method 2
         # self._hp_log = 40 * torch.rand((self.ensemble_number,)+ self._hp_low.shape) - 20
         self._hp = self.sigmoid_torch(self._hp_log, self._hp_low, self._hp_high).type_as(self.type_float)
@@ -366,7 +367,7 @@ class DataAssimilation(simulation):
         self.mul_property_by_subblk(self._hp_index_updating, self._hp.type_as(self.type_float).reshape(-1))
         self.get_hidden_state(steps, show_info=True)
 
-    def da_filter(self, bold_real_t, bold_sigma=1e-6, solo_rate=0.8, debug=False, bound=None):
+    def da_filter(self, bold_real_t, bold_sigma=1e-8, solo_rate=0.8, debug=False, bound=None):
         """
         Correct hidden_state by diffusion ensemble Kalman filter
 
