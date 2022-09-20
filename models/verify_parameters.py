@@ -21,8 +21,8 @@ def simulation(block_path="small_block_d100", Time=3000, noise_rate=0.003, delta
     if specified_gui is not None:
         property[:, 10:14] = torch.tensor(specified_gui)
 
-    property = property.cuda("cuda:0")
-    w_uij = w_uij.cuda("cuda:0")
+    # property = property.cuda("cuda:0")
+    # w_uij = w_uij.cuda("cuda:0")
     B = block(
         node_property=property,
         w_uij=w_uij,
@@ -30,7 +30,6 @@ def simulation(block_path="small_block_d100", Time=3000, noise_rate=0.003, delta
     )
     iter_time = int(Time / delta_t)
 
-    noise_rate = noise_rate * delta_t
     if document_time is not None:
         document_iter_time = int(document_time / delta_t)
         document_start = iter_time - document_iter_time
@@ -44,8 +43,8 @@ def simulation(block_path="small_block_d100", Time=3000, noise_rate=0.003, delta
         print(time, end='\r')
         B.run(noise_rate=noise_rate, isolated=False)
         if time >= document_start:
-            log_all[time - document_start] = B.active.data.cpu().numpy()[1400:1650]
-            synaptic_current[time - document_start] = B.I_ui.mean(axis=-1).cpu().numpy()
+            log_all[time - document_start] = B.active.data.numpy()[1400:1650]
+            synaptic_current[time - document_start] = B.I_ui.mean(axis=-1).numpy()
     windows = int(1 / delta_t)
     print('window,', windows)
     log_all = log_all.reshape((-1, windows, 250))
