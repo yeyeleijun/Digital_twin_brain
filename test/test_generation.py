@@ -305,16 +305,17 @@ class TestBlock(unittest.TestCase):
             out_conn_prob = out_conn_prob / out_conn_prob.sum(axis=1, keepdims=True)
         return out_conn_prob, out_gm, out_degree_scale
 
-    def test_make_small_block(self, write_path="../small_blocks", initial_parameter=(0.00495148, 0.0009899, 0.08417509, 0.00458287)):
+    def test_make_small_block(self, write_path="../small_blocks/critical_3hz_0.1ms", initial_parameter=(0.01837975, 0.00072405, 0.10759494, 0.02180028)):
         prob = torch.tensor([[0.8, 0.2], [0.8, 0.2]])
-        tau_ui = (2, 40, 10, 50)
+        tau_ui = (8, 40, 10, 50)
         population_kwards = [{'g_Li': 0.03,
                               'g_ui': initial_parameter,
                               'T_ref': 5,
                               "V_reset": -65,
                               'tao_ui': tau_ui,
+                              'noise_rate': 0.0003,
                               'size': num} for num in [1600, 400]]
-        connect_for_multi_sparse_block(prob, population_kwards, degree=100, init_min=0,
+        connect_for_multi_sparse_block(prob, population_kwards, degree=100, init_min=1,
                                        init_max=1, prefix=write_path)
         print("Done")
 

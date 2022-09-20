@@ -131,7 +131,6 @@ class block:
 
         """
         self.t += self.delta_t
-        noise_rate *= self.delta_t
         self.active = self.update_Vi(self.delta_t)
         if not isolated:
             new_active = (torch.rand(self.w_uij.shape[2], device=self.w_uij.device) < noise_rate) | self.active
