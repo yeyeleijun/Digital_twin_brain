@@ -404,7 +404,7 @@ class TestBlock(unittest.TestCase):
                                            dtype="single",
                                            debug_block_dir=None)
 
-    def _test_generate_normal_voxel_whole_brain(self, path="./data/jianfeng_normal", degree=100,
+    def _test_generate_normal_voxel_whole_brain(self, root_path="./data/jianfeng_normal", degree=100,
                                                 minimum_neurons_for_block=(200, 50),
                                                 scale=int(1e8), init_min=1, init_max=1):
         second_path = self._make_directory_tree(root_path, scale, degree, init_min, init_max, "critical")
