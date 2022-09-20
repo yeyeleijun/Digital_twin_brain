@@ -238,10 +238,11 @@ class DataAssimilation(simulation):
         self._hp_high = gui_high_ppopu.reshape(-1).type_as(self.type_float)
         # method 1
         self._hp_log = torch.linspace(-20, 20, self.ensemble_number).repeat_interleave(len(self._hp_low))
-        self._hp_log = self._hp_log.type_as(self.type_float).reshape(self.ensemble_number, -1)
-        for i in range(len(self._hp_low)):
+        self._hp_log = self._hp_log.type_as(self.type_float).reshape(self.ensemble_number, -1, self._hp_num)
+        for i in range(self._hp_num):
             idx = np.random.choice(self.ensemble_number, self.ensemble_number, replace=False)
-            self._hp_log[:, i] = self._hp_log[idx, i]
+            self._hp_log[:, :, i] = self._hp_log[idx, :, i]
+        self._hp_log = self._hp_log.reshape(self.ensemble_number, -1)
         # method 2
         # self._hp_log = 40 * torch.rand((self.ensemble_number,)+ self._hp_low.shape) - 20
         self._hp = self.sigmoid_torch(self._hp_log, self._hp_low, self._hp_high).type_as(self.type_float)
@@ -312,12 +313,12 @@ class DataAssimilation(simulation):
 
         """
         for p in property_index:
-            self.gamma_initialize(self.population_id, p, alpha, alpha)
+            self.gamma_initialize(p, alpha=alpha, beta=alpha)
         self._property_index = torch.tensor(property_index).type_as(self.type_int).reshape(-1)
         # index_da_population could be optimized
         index_da_population = self.population_id if index_da_population is None else index_da_population
         self._hp_index_updating = torch.stack((torch.meshgrid(index_da_population, self._property_index)),
-                                              dim=1).reshape(-1, 2).type_as(self.type_int)
+                                              dim=-1).reshape(-1, 2).type_as(self.type_int)
         print(self._hp_index_updating, self._hp_index_updating[:, 1], self._hp_index_updating[:, 0], gui.shape)
         self.mul_property_by_subblk(self._hp_index_updating, gui.type_as(self.type_float).reshape(-1))
 
@@ -366,7 +367,7 @@ class DataAssimilation(simulation):
         self.mul_property_by_subblk(self._hp_index_updating, self._hp.type_as(self.type_float).reshape(-1))
         self.get_hidden_state(steps, show_info=True)
 
-    def da_filter(self, bold_real_t, bold_sigma=1e-6, solo_rate=0.8, debug=False):
+    def da_filter(self, bold_real_t, bold_sigma=1e-8, solo_rate=0.8, debug=False, bound=None):
         """
         Correct hidden_state by diffusion ensemble Kalman filter
 
@@ -382,6 +383,9 @@ class DataAssimilation(simulation):
         debug: bool, default=False
             Return hidden_state to debug if debug is true
 
+        bound: int, default=40
+            trail
+
         """
         if debug:
             self._hidden_state, w_debug = diffusion_enkf(self._hidden_state, bold_sigma, bold_real_t, solo_rate, debug)
@@ -389,6 +393,8 @@ class DataAssimilation(simulation):
         else:
             self._hidden_state = diffusion_enkf(self._hidden_state, bold_sigma, bold_real_t, solo_rate)
         self._hp_log = self._hidden_state[:, :, :-6].reshape(self.ensemble_number, -1)[:, self.from_hidden_state]
+        if bound is not None:
+            self._hp_log = torch.clamp(self._hp_log, -bound, bound)
         self.bold.state_update(self._hidden_state[:, :, -5:-1])
 
     def da_rest_run(self, bold_real, write_path, observation_times=None):
