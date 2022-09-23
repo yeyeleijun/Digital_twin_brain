@@ -305,17 +305,23 @@ class TestBlock(unittest.TestCase):
             out_conn_prob = out_conn_prob / out_conn_prob.sum(axis=1, keepdims=True)
         return out_conn_prob, out_gm, out_degree_scale
 
-    def test_make_small_block(self, write_path="../small_blocks", initial_parameter=(0.00495148, 0.0009899, 0.08417509, 0.00458287)):
+    def test_make_small_block(self, write_path="../data/small_blocks/critical_blocks_d100", initial_parameter=(2.13037975e-02, 1.39240506e-04, 1.58227848e-01, 1.89873418e-02)):
         prob = torch.tensor([[0.8, 0.2], [0.8, 0.2]])
-        tau_ui = (2, 40, 10, 50)
+        tau_ui = (8, 40, 10, 50)
         population_kwards = [{'g_Li': 0.03,
                               'g_ui': initial_parameter,
                               'T_ref': 5,
                               "V_reset": -65,
+                              "noise_rate": 0.0003,
                               'tao_ui': tau_ui,
                               'size': num} for num in [1600, 400]]
-        connect_for_multi_sparse_block(prob, population_kwards, degree=100, init_min=0,
-                                       init_max=1, prefix=write_path)
+        conn = connect_for_multi_sparse_block(prob, population_kwards, degree=100, init_min=1,
+                                       init_max=1, prefix=None)
+        merge_dti_distributation_block(conn, write_path,
+                                       MPI_rank=None,
+                                       number=4,
+                                       dtype="single",
+                                       debug_block_dir=None)
         print("Done")
 
     def _test_make_whole_brain_include_cortical_laminar_and_subcortical_voxel_model(self,
