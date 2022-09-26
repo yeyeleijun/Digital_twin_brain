@@ -36,15 +36,12 @@ def rest_column_simulation(args):
 
     """
     block_path = os.path.join(args.block_dir, "single")
-    model = simulation(block_path, args.ip, dt=1., route_path=None, column=True, print_info=True, vmean_option=True,
+    model = simulation(args.ip, block_path, route_path=None, column=True, print_info=True, vmean_option=True,
                        sample_option=True, name=args.name, write_path=args.write_path)
     aal_region = np.load(args.aal_info_path)['aal_region']
     population_base = np.load(os.path.join(args.block_dir, "supplementary_info", "population_base.npy"))
     model.sample(aal_region, population_base)
-    if not args.hp_after_da_path:
-        args.hp_after_da_path = None
     model(observation_time=100, hp_index=10, hp_path=args.hp_after_da_path)
-
 
 
 if __name__ == "__main__":

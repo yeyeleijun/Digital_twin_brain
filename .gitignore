@@ -520,9 +520,10 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+# Cython debug symbols
+cython_debug/
 
 PD-401/*
-
 data_analysis/*
-
 small_blocks/*
+*.mat

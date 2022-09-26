@@ -10,6 +10,7 @@ import torch
 import numpy as np
 from simulation.simulation import simulation
 import matplotlib.pyplot as mp
+
 mp.switch_backend('Agg')
 
 
@@ -44,20 +45,18 @@ def diffusion_enkf(w_hat, bold_sigma, bold_t, solo_rate, debug=False):
     w_cx = w_diff[:, :, -1] * w_diff[:, :, -1]
     w_cxx = torch.sum(w_cx, dim=0) / (ensembles - 1) + bold_sigma
     temp = w_diff[:, :, -1] / (w_cxx.reshape([1, brain_num])) / (ensembles - 1)  # (ensemble, brain)
-    # kalman = torch.mm(temp.T, w_diff.reshape([ensembles, brain_n*hp_num]))  # (brain_n, w_shape[1])
-    model_noise = bold_sigma ** 0.5 * torch.normal(0, 1, size=(ensembles, brain_num)).type_as(temp)
-    w += solo_rate * (bold_t + model_noise - w_hat[:, :, -1])[:, :, None] \
-         * torch.sum(temp[:, :, None] * w_diff.reshape([ensembles, brain_num, state_num]), dim=0, keepdim=True)
-    w += (1 - solo_rate) * torch.mm(torch.mm(bold_t + model_noise - w_hat[:, :, -1], temp.T) / brain_num,
-                               w_diff.reshape([ensembles, brain_num * state_num])).reshape(
-        [ensembles, brain_num, state_num])
+    # kalman = torch.mm(temp.T, w_diff.reshape([ensembles, brain_num*state_num]))  # (brain_n, brain_num*state_num)
+    bold_with_noise = bold_t + bold_sigma ** 0.5 * torch.normal(0, 1, size=(ensembles, brain_num)).type_as(bold_t)
+    w += solo_rate * (bold_with_noise - w_hat[:, :, -1])[:, :, None] * torch.sum(temp[:, :, None] * w_diff, dim=0,
+                                                                                 keepdim=True)
+    w += (1 - solo_rate) * torch.mm(torch.mm(bold_with_noise - w_hat[:, :, -1], temp.T) / brain_num,
+                                    w_diff.reshape([ensembles, -1])).reshape(w_hat.shape)
     if debug:
-        print(w_cxx.max(), w_cxx.min())
-        print(w[:, :, :state_num - 5].max(), w[:, :, :state_num - 5].min())
-        w_debug = w_hat[:, :10, -1][None, :, :] + (bold_t + model_noise - w_hat[:, :, -1]).T[:, :, None] \
-                  * torch.mm(temp.T, w_diff[:, :10, -1])[:, None, :]  # brain, ensemble, 10
+        w_debug = w_hat[:, :10, -1][None, :, :] + (bold_with_noise - w_hat[:, :, -1]).T[:, :, None] \
+                  * torch.mm(temp.T, w_diff[:, :10, -1])[:, None, :]  # brain_num, ensemble, 10
         return w, w_debug
     else:
+        print(w_cxx.max(), w_cxx.min(), w[:, :, :-6].max(), w[:, :, :-6].min())
         return w
 
 
@@ -69,7 +68,8 @@ class DataAssimilation(simulation):
     It means that in DA procedure, the step units in indexing the populations between ensembles.
 
     """
-    def __init__(self, block_path: str, ip: str, route_path: str, column: bool, **kwargs):
+
+    def __init__(self, block_path: str, ip: str, dt=1, route_path=None, column=True, **kwargs):
         """
         By giving the iP and block path, a DataAssimilation object is initialized.
         Usually in the case: 100 ensemble, i.e., 100 simulation ensemble.
@@ -92,52 +92,50 @@ class DataAssimilation(simulation):
         kwargs: other positional params which are specified.
 
         """
-        super().__init__(self, block_path, ip, route_path, column, **kwargs)
+        super(DataAssimilation, self).__init__(ip, block_path, dt, route_path, column, **kwargs)
         self._ensemble_number = kwargs.get("ensemble", 100)
-        assert (self.total_neurons % self._ensemble_number == 0)
-        self._num_populations_pblk = int(self.total_populations // self._ensemble_number)
+        assert (self.num_neurons % self._ensemble_number == 0)
         self._hidden_state = None
         self._property_index = None
-        self.column = column
         self._index_da_voxel_pblk = None  # for bold single
         self._hp_index_updating = None  # shape=(ensemble_n*num_da_population_pblk*hp_num, 2)
         self._hp_log = None  # shape=(ensemble_n, num_da_population_pblk*hp_num)
         self._hp = None  # shape=(ensemble_n* num_da_population_pblk*hp_num)
         self._hp_low = None  # shape=(num_da_population_pblk*hp_num)
         self._hp_high = None  # shape=(num_da_population_pblk*hp_num)
-        self._hp_num = None
+        self._hp_num = None  # len(property)
         self.for_hidden_state = None
         self.from_hidden_state = None
 
     @staticmethod
     def log_torch(val, lower, upper, scale=10):
-        assert len(val.shape) == 2
+        val_shape = val.shape
         assert len(lower.shape) == 1
+        assert val_shape[-1] == lower.shape[-1]
+        val = val.reshape(-1, lower.shape[-1])
+        if (val >= upper).all() or (val <= lower).all():
+            print('val <= upper).all() and (val >= lower).all()?')
         if isinstance(val, torch.Tensor):
-            if (val <= upper).all() and (val >= lower).all():
-                out = scale * (torch.log(val - lower) - torch.log(upper - val))
-                return out
-            else:
-                print('val <= upper).all() and (val >= lower).all()?')
+            out = scale * (torch.log(val - lower) - torch.log(upper - val))
+            return out.reshape(val_shape)
         elif isinstance(val, np.ndarray):
-            if (val <= upper).all() and (val >= lower).all():
-                out = scale * (np.log(val - lower) - np.log(upper - val))
-                return out
-            else:
-                print('val <= upper).all() and (val >= lower).all()?')
+            out = scale * (np.log(val - lower) - np.log(upper - val))
+            return out.reshape(val_shape)
         else:
             print('torch.Tensor or np.ndarray?')
 
     @staticmethod
     def sigmoid_torch(val, lower, upper, scale=10):
-        assert len(val.shape) == 2
+        val_shape = val.shape
         assert len(lower.shape) == 1
+        assert val_shape[-1] == lower.shape[-1]
+        val = val.reshape(-1, lower.shape[-1])
         if isinstance(val, torch.Tensor):
             out = lower + (upper - lower) * torch.sigmoid(val / scale)
-            return out
+            return out.reshape(val_shape)
         elif isinstance(val, np.ndarray):
             out = lower + (upper - lower) * 1 / (1 + np.exp(-val.astype(np.float32)) / scale)
-            return out
+            return out.reshape(val_shape)
         else:
             print('torch.Tensor or np.ndarray?')
 
@@ -187,6 +185,22 @@ class DataAssimilation(simulation):
     def ensemble_number(self):
         return self._ensemble_number
 
+    @property
+    def _num_populations_pblk(self):
+        return int(self.num_populations // self._ensemble_number)
+
+    @property
+    def _num_voxel_pblk(self):
+        return int(self.num_voxels // self.ensemble_number)
+
+    @property
+    def type_int(self):
+        return torch.tensor([0]).type_as(self.population_id).type(torch.int64)
+
+    @property
+    def type_float(self):
+        return torch.tensor([0]).type_as(self.population_id).type(torch.float32)
+
     def hp_random_initialize(self, gui_low_ppopu, gui_high_ppopu, num_da_populations_pblk=None, gui_pblk=False):
         """
         Generate initial hyper parameters of each ensemble brain samples
@@ -196,10 +210,10 @@ class DataAssimilation(simulation):
         Parameters
         ----------
 
-        gui_low_ppopu: torch.tensor, shape=(_index_da_voxel_pblk, hp_num)
+        gui_low_ppopu: torch.tensor, shape=(num_da_populations_pblk, hp_num)
             low bound of hyper-parameters
 
-        gui_high_ppopu: torch.tensor, shape=(_index_da_voxel_pblk, hp_num)
+        gui_high_ppopu: torch.tensor, shape=(num_da_populations_pblk, hp_num)
             low bound of hyper-parameters
 
         num_da_populations_pblk: int
@@ -220,20 +234,22 @@ class DataAssimilation(simulation):
             gui_high_ppopu = gui_high_ppopu.repeat(num_da_populations_pblk, 1)
         assert gui_low_ppopu.shape[0] == num_da_populations_pblk
         self._hp_num = gui_low_ppopu.shape[1]
-        self._hp_low = gui_low_ppopu.reshape(-1)
-        self._hp_high = gui_high_ppopu.reshape(-1)
+        self._hp_low = gui_low_ppopu.reshape(-1).type_as(self.type_float)
+        self._hp_high = gui_high_ppopu.reshape(-1).type_as(self.type_float)
         # method 1
         self._hp_log = torch.linspace(-20, 20, self.ensemble_number).repeat_interleave(len(self._hp_low))
-        self._hp_log = self._hp_log.type_as(torch.float32).reshape(self.ensemble_number, -1)
-        for i in range(len(self._hp_low)):
+        self._hp_log = self._hp_log.type_as(self.type_float).reshape(self.ensemble_number, -1, self._hp_num)
+        for i in range(self._hp_num):
             idx = np.random.choice(self.ensemble_number, self.ensemble_number, replace=False)
-            self._hp_log[:, i] = self._hp_log[idx, i]
+            self._hp_log[:, :, i] = self._hp_log[idx, :, i]
+        self._hp_log = self._hp_log.reshape(self.ensemble_number, -1)
         # method 2
         # self._hp_log = 40 * torch.rand((self.ensemble_number,)+ self._hp_low.shape) - 20
-        self._hp = self.sigmoid_torch(self._hp_log, self._hp_low, self._hp_high)
+        self._hp = self.sigmoid_torch(self._hp_log, self._hp_low, self._hp_high).type_as(self.type_float)
+        print(self._hp.shape)
         return self._hp.reshape(-1)
 
-    def hp_index2hidden_state(self, path_cortical_or_not, index_da_voxel_pblk=None):
+    def hp_index2hidden_state(self, path_cortical_or_not=None, index_da_voxel_pblk=None):
         """
         Complete assignment: self._index_da_voxel_pblk, self.for_hidden_state, self.from_hidden_state
 
@@ -246,30 +262,33 @@ class DataAssimilation(simulation):
             index of voxel in single block sample to assimilate
 
         """
-        self._index_da_voxel_pblk = torch.arange(self.num_voxel//self.ensemble_number) if index_da_voxel_pblk is None \
+        self._index_da_voxel_pblk = torch.arange(self._num_voxel_pblk) if index_da_voxel_pblk is None \
             else torch.tensor(index_da_voxel_pblk).reshape(-1)
-        cortical_or_not = np.load(path_cortical_or_not).reshape(-1)
-        da_cortical_or_not = cortical_or_not[self._index_da_voxel_pblk]
-        num_da_voxel = da_cortical_or_not.shape
+        if path_cortical_or_not is None:
+            da_cortical_or_not = np.zeros(self._num_voxel_pblk).reshape(-1)[self._index_da_voxel_pblk] == 1
+        else:
+            da_cortical_or_not = np.load(path_cortical_or_not).reshape(-1)[self._index_da_voxel_pblk] == 1
+        num_da_voxel = da_cortical_or_not.shape[0]
         if da_cortical_or_not.sum() == da_cortical_or_not.shape:
-            self.for_hidden_state = torch.arange(num_da_voxel * 8 * self._hp_num).type_as(self.populations)
-            self.from_hidden_state = torch.arange(num_da_voxel * 8 * self._hp_num).type_as(self.populations)
+            self.for_hidden_state = torch.arange(num_da_voxel * 8 * self._hp_num).type_as(self.type_int)
+            self.from_hidden_state = torch.arange(num_da_voxel * 8 * self._hp_num).type_as(self.type_int)
         elif da_cortical_or_not.sum() == 0:
-            self.for_hidden_state = torch.arange(num_da_voxel * 2 * self._hp_num).type_as(self.populations)
-            self.from_hidden_state = torch.arange(num_da_voxel * 2 * self._hp_num).type_as(self.populations)
+            self.for_hidden_state = torch.arange(num_da_voxel * 2 * self._hp_num).type_as(self.type_int)
+            self.from_hidden_state = torch.arange(num_da_voxel * 2 * self._hp_num).type_as(self.type_int)
         else:
             self.for_hidden_state = 10 * torch.arange(num_da_voxel).reshape(-1, 1) + torch.tensor([6, 7]).repeat(4)
-            self.for_hidden_state = self.for_hidden_state.reshape(da_cortical_or_not.shape, 8)
-            self.for_hidden_state[:, da_cortical_or_not] += torch.tensor([-4, -4, -2, -2, 0, 0, 2, 2])
+            self.for_hidden_state[da_cortical_or_not] += torch.tensor([-4, -4, -2, -2, 0, 0, 2, 2])
             self.for_hidden_state = self.for_hidden_state.reshape(-1).repeat_interleave(self._hp_num)
-            voxel_from_hidden_state = 8 * torch.arange(num_da_voxel).reshape(-1, 1) + torch.tensor([0, 1])
-            cortical_from_hidden_state = 8 * torch.arange(num_da_voxel)[da_cortical_or_not]\
-                .reshape(-1, 1) + torch.tensor([2, 3, 4, 5, 6, 7])
+            voxel_from_hidden_state = (8 * torch.arange(num_da_voxel).reshape(-1, 1) + torch.tensor([0, 1])).reshape(-1)
+            cortical_from_hidden_state = (8 * torch.arange(num_da_voxel)[da_cortical_or_not]
+                                          .reshape(-1, 1) + torch.tensor([2, 3, 4, 5, 6, 7])).reshape(-1)
             self.from_hidden_state = torch.cat((voxel_from_hidden_state, cortical_from_hidden_state), dim=0)
             self.from_hidden_state, _ = self.from_hidden_state.reshape(-1, 1).sort()
             self.from_hidden_state = (self._hp_num * self.from_hidden_state + torch.arange(self._hp_num)).reshape(-1)
-            self.for_hidden_state = self.for_hidden_state.type_as(self.populations)
-            self.from_hidden_state = self.from_hidden_state.type_as(self.populations)
+            self.for_hidden_state = self.for_hidden_state.type_as(self.type_int)
+            self.from_hidden_state = self.from_hidden_state.type_as(self.type_int)
+        # print(self.for_hidden_state.shape, self.from_hidden_state.shape, self._index_da_voxel_pblk.shape,
+        #       da_cortical_or_not.shape)
 
     def da_property_initialize(self, property_index, alpha, gui, index_da_population=None):
         """
@@ -293,15 +312,17 @@ class DataAssimilation(simulation):
             index of voxel assimilated or updated
 
         """
-        self.gamma_initialize(property_index, alpha, alpha)
-        self._property_index = torch.tensor(property_index).type_as(self.populations).reshape(-1)
+        for p in property_index:
+            self.gamma_initialize(p, alpha=alpha, beta=alpha)
+        self._property_index = torch.tensor(property_index).type_as(self.type_int).reshape(-1)
         # index_da_population could be optimized
-        index_da_population = self.populations if index_da_population is None else index_da_population
+        index_da_population = self.population_id if index_da_population is None else index_da_population
         self._hp_index_updating = torch.stack((torch.meshgrid(index_da_population, self._property_index)),
-                                              dim=1).reshape(-1, 2)
-        self.mul_property_by_subblk(self._hp_index_updating.type_as(torch.int64), gui.reshape(-1))
+                                              dim=-1).reshape(-1, 2).type_as(self.type_int)
+        print(self._hp_index_updating, self._hp_index_updating[:, 1], self._hp_index_updating[:, 0], gui.shape)
+        self.mul_property_by_subblk(self._hp_index_updating, gui.type_as(self.type_float).reshape(-1))
 
-    def get_hidden_state(self, steps, show_info=False):
+    def get_hidden_state(self, steps=800, show_info=False):
         """
         The block evolve one TR time, i.e, 800 ms as default setting.
 
@@ -317,14 +338,15 @@ class DataAssimilation(simulation):
 
         """
         out = torch.stack(self.evolve(step=steps, vmean_option=False, sample_option=False, bold_detail=True), dim=0).T
-        out = out.reshape(self.ensemble_number, self._num_populations_pblk, 5)[:, self._index_da_voxel_pblk]
+        out = out.reshape(self.ensemble_number, self._num_voxel_pblk, 6)[:, self._index_da_voxel_pblk]
         self._hidden_state = torch.cat((self._hp_log.reshape(self.ensemble_number, -1)[:, self.for_hidden_state]
                                         .reshape(out.shape[0], out.shape[1], -1),
                                         out), dim=2)
         if show_info:
-            print(f'self._hidden_state.shape={self._hidden_state.shape}')
-            print(f'(Frequency.max, mean, min)={out[0].max(), out[0].mean(), out[0].min()}')
-            print(f'(BOLD.max, mean, min)={out[4].max(), out[4].mean(), out[4].min()}')
+            # print(f'self._hidden_state.shape={self._hidden_state.shape}')
+            print(f'(hp_log.max, mean, min)={self._hp_log.max(), self._hp_log.mean(), self._hp_log.min()}')
+            print(f'(Frequency.max, mean, min)={out[:, :, 0].max(), out[:, :, 0].mean(), out[:, :, 0].min()}')
+            print(f'(BOLD.max, mean, min)={out[:, :, -1].max(), out[:, :, -1].mean(), out[:, :, -1].min()}')
 
     def da_evolve(self, steps=800, hp_sigma=1):
         """
@@ -340,12 +362,12 @@ class DataAssimilation(simulation):
             Variance of noise added to hyper-parameters
 
         """
-        self._hp_log += torch.normal(0, hp_sigma**0.5, size=self._hp_log.shape).type_as(self._hp_log)
+        self._hp_log += torch.normal(0, hp_sigma ** 0.5, size=self._hp_log.shape).type_as(self.type_float)
         self._hp = self.sigmoid_torch(self._hp_log, self._hp_low, self._hp_high)
-        self.mul_property_by_subblk(self._hp_index_updating, self._hp.reshape(-1))
-        self.get_hidden_state(steps)
+        self.mul_property_by_subblk(self._hp_index_updating, self._hp.type_as(self.type_float).reshape(-1))
+        self.get_hidden_state(steps, show_info=True)
 
-    def da_filter(self, bold_real_t, bold_sigma=1e-8, solo_rate=0.5, debug=False):
+    def da_filter(self, bold_real_t, bold_sigma=1e-8, solo_rate=0.8, debug=False, bound=None):
         """
         Correct hidden_state by diffusion ensemble Kalman filter
 
@@ -361,13 +383,18 @@ class DataAssimilation(simulation):
         debug: bool, default=False
             Return hidden_state to debug if debug is true
 
+        bound: int, default=40
+            trail
+
         """
         if debug:
             self._hidden_state, w_debug = diffusion_enkf(self._hidden_state, bold_sigma, bold_real_t, solo_rate, debug)
             return w_debug
         else:
             self._hidden_state = diffusion_enkf(self._hidden_state, bold_sigma, bold_real_t, solo_rate)
-        self._hp_log = self._hidden_state[:, :, :-5].reshape(self.ensemble_number, -1)[:, self.from_hidden_state]
+        self._hp_log = self._hidden_state[:, :, :-6].reshape(self.ensemble_number, -1)[:, self.from_hidden_state]
+        if bound is not None:
+            self._hp_log = torch.clamp(self._hp_log, -bound, bound)
         self.bold.state_update(self._hidden_state[:, :, -5:-1])
 
     def da_rest_run(self, bold_real, write_path, observation_times=None):
@@ -391,24 +418,33 @@ class DataAssimilation(simulation):
         """
         w_save = list()
         w_fix = list()
+        bold_real = bold_real.type_as(self.type_float)
+        assert bold_real.shape[1] == self._index_da_voxel_pblk.shape[0]
         observation_times = bold_real.shape[0] if observation_times is None else observation_times
         for t in range(observation_times):
             start_time = time.time()
             self.da_evolve(800)
             w_save.append(torch2numpy(self._hidden_state))
-            self.da_filter(bold_real[t].reshape((1,) + self._index_da_voxel_pblk.shape))
+            self.da_filter(bold_real[t].reshape(1, -1))
             w_fix.append(torch2numpy(self._hidden_state))
             if t <= 9 or t % 50 == 49 or t == (observation_times - 1):
                 np.save(os.path.join(write_path, "w.npy"), w_save)
                 np.save(os.path.join(write_path, "w_fix.npy"), w_fix)
             print("------------run da" + str(t) + ":" + str(time.time() - start_time))
-        bold_assimilation = torch2numpy(torch.stack(w_save)[:, :, :, -1])
+        bold_assimilation = np.stack(w_save)[:, :, :, -1]
+        print(np.stack(w_save).shape)
+        hp_save_log = np.stack(w_save)[:, :, :, :-6].reshape(observation_times, self.ensemble_number, -1)
+        del w_fix, w_save
         np.save(os.path.join(write_path, "bold_assimilation.npy"), bold_assimilation)
-        self.plot_bold(write_path, bold_real, bold_assimilation, np.arange(10))
-        hp_save_log = torch.stack(w_save)[:, :, :, :self._hp_num]
-        hp_sm = torch2numpy(self.sigmoid_torch(hp_save_log, self._hp_low, self._hp_high))
+        self.plot_bold(write_path, torch2numpy(bold_real), bold_assimilation, np.arange(10))
+        hp_save_log = hp_save_log[:, :, torch2numpy(self.from_hidden_state)].reshape(observation_times,
+                                                                                     self.ensemble_number, -1)
+        hp_sm = self.sigmoid_torch(hp_save_log, torch2numpy(self._hp_low), torch2numpy(self._hp_high))
+        hp_sm = hp_sm.reshape(observation_times, self.ensemble_number, -1, self._hp_num)
         np.save(os.path.join(write_path, "hp_sm.npy"), hp_sm.mean(1))
         self.plot_hp(write_path, None, hp_sm, np.arange(10), self._hp_num, 'hp_sm')
-        hp_ms = torch2numpy(self.sigmoid_torch(hp_save_log.mean(1), self._hp_low, self._hp_high))
+        hp_ms = self.sigmoid_torch(hp_save_log.mean(1), torch2numpy(self._hp_low), torch2numpy(self._hp_high))
+        hp_ms = hp_ms.reshape(observation_times, -1, self._hp_num)
         np.save(os.path.join(write_path, "hp_ms.npy"), hp_ms)
         self.plot_hp(write_path, None, np.expand_dims(hp_ms, 1), np.arange(10), self._hp_num, 'hp_ms')
+        self.block_model.shutdown()

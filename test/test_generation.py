@@ -105,11 +105,11 @@ class TestBlock(unittest.TestCase):
                                22.1 * 83, 22.1 * 17], dtype=np.float64)  # ignore the L1 neurons
         else:
             # 4:1 setting, setting from wenyong
-            # lcm_connect_prob = np.array([[0.3, 0.2, 0.5],
-            #                              [0.3, 0.2, 0.5]], dtype=np.float64)
+            lcm_connect_prob = np.array([[0.3, 0.2, 0.5],
+                                         [0.3, 0.2, 0.5]], dtype=np.float64)
             # 4:1 setting, setting inferred from micro-column
-            lcm_connect_prob = np.array([[4 / 7, 1 / 7, 2 / 7],
-                                         [4 / 7, 1 / 7, 2 / 7]], dtype=np.float64)
+            # lcm_connect_prob = np.array([[4 / 7, 1 / 7, 2 / 7],
+            #                             [4 / 7, 1 / 7, 2 / 7]], dtype=np.float64)
             lcm_gm = np.array([0.8, 0.2], dtype=np.float64)
 
         lcm_gm /= lcm_gm.sum()
