@@ -440,7 +440,7 @@ class TestBlock(unittest.TestCase):
                    'g_Li': 0.03,
                    'g_ui': gui,
                    'tao_ui': (8, 40, 10, 50),  # old setting: [2, 40, 10, 50]
-                   'noise_rate': 0.003,  # old setting: 0.01 Hz
+                   'noise_rate': 0.0003,  # old setting: 0.01 Hz
                    "size": int(max(b * scale, minimum_neurons_for_block[i % 2]))}
                   for i, b in enumerate(block_size)]
 

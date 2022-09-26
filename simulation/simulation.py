@@ -275,7 +275,7 @@ class simulation(object):
         out = (temp_freq,)
         out_base = 1
         if vmean_option:
-            temp_vmean = torch.stack([x[1] for x in total_res], dim=0)
+            temp_vmean = torch.stack([x[out_base] for x in total_res], dim=0)
             out += (temp_vmean,)
             out_base += 1
         if sample_option:
@@ -310,11 +310,12 @@ class simulation(object):
         start_time = time.time()
         if hp_total is not None:
             state = "after"
-            self.gamma_initialize(hp_index, self.population_id)
+            for k in hp_index:
+                self.gamma_initialize(k, self.population_id)
             population_info = torch.stack(
                 torch.meshgrid(self.population_id, torch.tensor(hp_index, dtype=torch.int64, device="cuda:0")),
                 dim=-1).reshape((-1, 2))
-            self.block_model.mul_property_by_subblk(population_info, hp_total[0, :])
+            self.block_model.mul_property_by_subblk(population_info, hp_total[0].reshape(-1))
             hp_total = hp_total[1:, ]
             total_T = hp_total.shape[0]
             assert observation_time <= total_T
@@ -322,11 +323,11 @@ class simulation(object):
             state = "before"
             total_T = None
 
-        freqs, _ = self.evolve(3200, vmean_option=False, sample_option=False)
+        freqs, _ = self.evolve(3200, vmean_option=False, sample_option=False, imean_option=False)
         Init_end = time.time()
         if self.print_info:
             print(
-                f"max fre: {torch.max(torch.mean(freqs / self.block_model.neurons_per_subblk.float() * 1000, dim=0)):.1f}")
+                f"mean fre: {torch.mean(torch.mean(freqs / self.block_model.neurons_per_subblk.float() * 1000, dim=0)):.1f}")
         pretty_print(f"Init have Done, cost time {Init_end - start_time:.2f}")
 
         pretty_print("Begin Simulation")
@@ -336,7 +337,6 @@ class simulation(object):
         for ii in range((observation_time - 1) // 50 + 1):
             nj = min(observation_time - ii * 50, 50)
             FFreqs = np.zeros([nj, step, self.num_populations], dtype=np.uint32)
-            # Noise_Spike = np.zeros([nj, step, self.num_sample], dtype=np.uint8)
             if self.vmean_option:
                 Vmean = np.zeros([nj, step, self.num_populations], dtype=np.float32)
             if self.sample_option:
@@ -349,8 +349,8 @@ class simulation(object):
                 i = ii * 50 + j
                 t_sim_start = time.time()
                 if hp_total is not None:
-                    self.block_model.mul_property_by_subblk(population_info, hp_total[i, :])
-                out = self.evolve(step, vmean_option=self.vmean_option, sample_option=self.sample_option)
+                    self.block_model.mul_property_by_subblk(population_info, hp_total[i].reshape(-1))
+                out = self.evolve(step, vmean_option=self.vmean_option, sample_option=self.sample_option, imean_option=self.imean_option)
                 FFreqs[j] = torch_2_numpy(out[0])
                 out_base = 1
                 if self.vmean_option:
@@ -358,15 +358,15 @@ class simulation(object):
                     out_base += 1
                 if self.sample_option:
                     Spike[j] = torch_2_numpy(out[out_base])
-                    Vi[j] = Spike[j] = torch_2_numpy(out[out_base + 1])
+                    Vi[j] = torch_2_numpy(out[out_base + 1])
                     out_base += 2
                 if self.imean_option:
-                    Imean[i] = torch_2_numpy(out[out_base])
+                    Imean[j] = torch_2_numpy(out[out_base])
 
                 bolds_out[i, :] = torch_2_numpy(out[-1])
                 t_sim_end = time.time()
                 print(
-                    f"{i}th observation_time, max fre: {torch.max(torch.mean(out[0] / self.block_model.neurons_per_subblk.float() * 1000, dim=0)):.1f}, cost time {t_sim_end - t_sim_start:.1f}")
+                    f"{i}th observation_time, mean fre: {torch.mean(torch.mean(out[0] / self.block_model.neurons_per_subblk.float() * 1000, dim=0)):.1f}, cost time {t_sim_end - t_sim_start:.1f}")
             if self.sample_option:
                 np.save(os.path.join(self.write_path, f"spike_{state}_assim_{ii}.npy"), Spike)
                 np.save(os.path.join(self.write_path, f"vi_{state}_assim_{ii}.npy"), Vi)
@@ -374,7 +374,7 @@ class simulation(object):
                 np.save(os.path.join(self.write_path, f"vmean_{state}_assim_{ii}.npy"), Vmean)
             if self.imean_option:
                 np.save(os.path.join(self.write_path, f"imean_{state}_assim_{ii}.npy"), Imean)
-            np.save(os.path.join(self.write_path, f"freqs_{state}_assim_{ii}.npy"), FFreqs)
+            # np.save(os.path.join(self.write_path, f"freqs_{state}_assim_{ii}.npy"), FFreqs)
             np.save(os.path.join(self.write_path, f"bold_{state}_assim.npy"), bolds_out)
 
         pretty_print(f"Totally have Done, Cost time {time.time() - start_time:.2f} ")
@@ -400,7 +400,7 @@ class simulation(object):
         """
 
         info = {'name': self.name, "num_neurons": self.num_neurons, 'num_voxel': self.num_voxels,
-                'num_populations': self.num_populations}
+                'num_populations': self.num_populations, 'step': step}
         table_print(info)
         if hp_path is not None:
             hp_total = np.load(hp_path)

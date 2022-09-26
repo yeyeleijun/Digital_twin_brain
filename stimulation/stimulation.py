@@ -141,7 +141,6 @@ class SimulationVoxel(simulation):
         for ii in range((observation_time - 1) // 50 + 1):
             nj = min(observation_time - ii * 50, 50)
             FFreqs = np.zeros([nj, step, self.num_populations], dtype=np.uint32)
-            # Noise_Spike = np.zeros([nj, step, self.num_sample], dtype=np.uint8)
             if self.vmean_option:
                 Vmean = np.zeros([nj, step, self.num_populations], dtype=np.float32)
             if self.sample_option:
@@ -155,7 +154,7 @@ class SimulationVoxel(simulation):
                 t_sim_start = time.time()
                 if hp_total is not None:
                     self.block_model.mul_property_by_subblk(population_info, hp_total[i].reshape(-1))
-                out = self.evolve(step, vmean_option=self.vmean_option, sample_option=self.sample_option)
+                out = self.evolve(step, vmean_option=self.vmean_option, sample_option=self.sample_option, imean_option=self.imean_option)
                 FFreqs[j] = torch_2_numpy(out[0])
                 out_base = 1
                 if self.vmean_option:
@@ -166,8 +165,7 @@ class SimulationVoxel(simulation):
                     Vi[j] = torch_2_numpy(out[out_base + 1])
                     out_base += 2
                 if self.imean_option:
-                    Imean[i] = torch_2_numpy(out[out_base])
-
+                    Imean[j] = torch_2_numpy(out[out_base])
                 bolds_out[i, :] = torch_2_numpy(out[-1])
                 t_sim_end = time.time()
                 print(
@@ -203,7 +201,7 @@ class SimulationVoxel(simulation):
         """
 
         info = {'name': self.name, "num_neurons": self.num_neurons, 'num_voxels': self.num_voxels,
-                'num_populations': self.num_populations, step:8000}
+                'num_populations': self.num_populations, 'step': step}
         table_print(info)
         if hp_path is not None:
             hp_total = np.load(hp_path)
@@ -332,7 +330,7 @@ class SimulationVoxelCritical(SimulationVoxel):
                 t_sim_start = time.time()
                 if hp_total is not None:
                     self.block_model.mul_property_by_subblk(population_info, hp_total[i].reshape(-1))
-                out = self.evolve(step, vmean_option=self.vmean_option, sample_option=self.sample_option)
+                out = self.evolve(step, vmean_option=self.vmean_option, sample_option=self.sample_option, imean_option=self.imean_option)
                 # FFreqs[j] = torch_2_numpy(out[0])
                 out_base = 1
                 if self.vmean_option:
@@ -343,7 +341,7 @@ class SimulationVoxelCritical(SimulationVoxel):
                     Vi[j] = torch_2_numpy(out[out_base + 1])
                     out_base += 2
                 if self.imean_option:
-                    Imean[i] = torch_2_numpy(out[out_base])
+                    Imean[j] = torch_2_numpy(out[out_base])
 
                 bolds_out[i, :] = torch_2_numpy(out[-1])
                 t_sim_end = time.time()
@@ -352,7 +350,7 @@ class SimulationVoxelCritical(SimulationVoxel):
             # np.save(os.path.join(self.write_path, f"freqs_{state}_assim_{ii}.npy"), FFreqs)
             if self.sample_option:
                 np.save(os.path.join(self.write_path, f"spike_{state}_assim_{ii}.npy"), Spike)
-                np.save(os.path.join(self.write_path, f"vi_{state}_assim_{ii}.npy"), Vi)
+                # np.save(os.path.join(self.write_path, f"vi_{state}_assim_{ii}.npy"), Vi)
             if self.vmean_option:
                 np.save(os.path.join(self.write_path, f"vmean_{state}_assim_{ii}.npy"), Vmean)
             if self.imean_option:
@@ -450,7 +448,7 @@ class StimulationVoxel(SimulationVoxel):
 
         # stimulation setting to mimic beta oscillation
         T = observation_time * step
-        current_beta = self.generate_sin_current(total_T=T, amplitude=0.02, frequency=15)
+        current_beta = self.generate_sin_current(total_T=T, amplitude=0.04, frequency=20)
 
         # deep brain stimulation setting
         current_dbs = self.generate_dbs_current(dbs_option, total_T=T, start_T=0, end_T=T, amplitude_dbs=-6,
@@ -517,12 +515,6 @@ class StimulationVoxel(SimulationVoxel):
                 np.save(os.path.join(self.write_path, "spike_after_assim_{}.npy".format(ii)), Spike)
                 np.save(os.path.join(self.write_path, "vi_after_assim_{}.npy".format(ii)), Vi)
             if self.imean_option:
-                # Imean = Imean.reshape([-1, Imean.shape[-1]])
-                # Imean = Imean.reshape([Imean.shape[0], -1, 2])
-                # num_neurons_per_population = self.num_neurons_per_population_cpu.reshape([self.num_voxels, -1, 2])
-                # Imean = Imean * np.tile(num_neurons_per_population, (Imean.shape[0], 1, 1))
-                # Imean = Imean.sum(axis=-1)
-                # Imean = Imean / np.tile(self.num_neurons_per_voxel_cpu, (Imean.shape[0], 1))
                 Imean = Imean.reshape([-1, self.num_populations])
                 Imean_voxel = np.zeros([Imean.shape[0], self.num_voxels])
                 for k in range(Imean.shape[0]):
@@ -532,11 +524,20 @@ class StimulationVoxel(SimulationVoxel):
                                                      range=(0, self.num_populations)) / self.num_neurons_per_voxel_cpu
                 lfp_stn_l = Imean_voxel[:, np.isin(aal_region, np.array([90])).nonzero()[0]]
                 lfp_stn_r = Imean_voxel[:, np.isin(aal_region, np.array([91])).nonzero()[0]]
-                lfp_pal_l = Imean_voxel[:, np.isin(aal_region, np.array([74])).nonzero()[0]]
-                lfp_pal_r = Imean_voxel[:, np.isin(aal_region, np.array([75])).nonzero()[0]]
+                pal_l_idx = np.isin(aal_region, np.array([74])).nonzero()[0]
+                pal_r_idx = np.isin(aal_region, np.array([75])).nonzero()[0]
+                lfp_pal_l = Imean_voxel[:, pal_l_idx]
+                lfp_pal_r = Imean_voxel[:, pal_r_idx]
+                lfp_pal_l_region = np.sum(
+                    lfp_pal_l * np.tile(self.num_neurons_per_voxel_cpu[pal_l_idx], (lfp_pal_l.shape[0], 1)),
+                    axis=1) / np.sum(self.num_neurons_per_voxel_cpu[pal_l_idx])
+                lfp_pal_r_region = np.sum(
+                    lfp_pal_r * np.tile(self.num_neurons_per_voxel_cpu[pal_r_idx], (lfp_pal_r.shape[0], 1)),
+                    axis=1) / np.sum(self.num_neurons_per_voxel_cpu[pal_r_idx])
                 savemat(os.path.join(self.write_path, "lfp_roi.mat"),
                         {"lfp_stn_l": lfp_stn_l, "lfp_stn_r": lfp_stn_r, "lfp_pal_l": lfp_pal_l,
-                         "lfp_pal_r": lfp_pal_r})
+                         "lfp_pal_r": lfp_pal_r, "lfp_pal_l_region": lfp_pal_l_region,
+                         "lfp_pal_r_region": lfp_pal_r_region})
         np.save(os.path.join(self.write_path, "bold_after_assim.npy"), bold_out)
 
         pretty_print(f"Total simulation have done, Cost time {time.time() - start_time:.2f}")
