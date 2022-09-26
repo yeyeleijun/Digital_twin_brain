@@ -189,7 +189,7 @@ class simulation(object):
         assert isinstance(value, torch.Tensor)
         self.block_model.mul_property_by_subblk(index, value)
 
-    def gamma_initialize(self, hp_index, population_id, alpha=5., beta=5.):
+    def gamma_initialize(self, hp_index, population_id=None, alpha=5., beta=5.):
         """
         Use a distribution of gamma(alpha, beta) to update neuronal params,
         where alpha = beta = 5.
@@ -200,19 +200,24 @@ class simulation(object):
         hp_index: int
             indicate the column index among 21 attributes of LIF neuron.
 
+        population_id: torch.tensor, default=None
+            index of population whose parameters follow gamma distribution
+
         alpha: float, default=5.
 
         beta: float, default=5.
 
         """
 
+        population_id = self.population_id if population_id is None else population_id
         print(f"gamma_initialize {hp_index}th attribute, to value gamma({alpha}, {beta}) distribution\n")
         population_info = torch.stack(
             torch.meshgrid(population_id, torch.tensor([hp_index], dtype=torch.int64, device="cuda:0")),
             dim=-1).reshape((-1, 2))
         alpha = torch.ones(len(population_id), device="cuda:0") * alpha
         beta = torch.ones(len(population_id), device="cuda:0") * beta
-        self.block_model.gamma_property_by_subblk(population_info, alpha, beta, debug=False)
+        out = self.block_model.gamma_property_by_subblk(population_info, alpha, beta, debug=False)
+        print(f"gamma_initializing {hp_index}th attribute is {out}")
 
     def evolve(self, step, vmean_option=False, sample_option=False, imean_option=False, bold_detail=False) -> tuple:
         """
