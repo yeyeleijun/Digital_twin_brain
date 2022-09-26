@@ -280,7 +280,7 @@ class simulation(object):
         out = (temp_freq,)
         out_base = 1
         if vmean_option:
-            temp_vmean = torch.stack([x[1] for x in total_res], dim=0)
+            temp_vmean = torch.stack([x[out_base] for x in total_res], dim=0)
             out += (temp_vmean,)
             out_base += 1
         if sample_option:
@@ -310,7 +310,7 @@ class simulation(object):
         """
 
         if not hasattr(self, 'num_sample'):
-           raise NotImplementedError('Please set the sampling neurons first in simulation case')
+            raise NotImplementedError('Please set the sampling neurons first in simulation case')
 
         start_time = time.time()
         if hp_total is not None:
@@ -328,7 +328,7 @@ class simulation(object):
             state = "before"
             total_T = None
 
-        freqs, _ = self.evolve(3200, vmean_option=False, sample_option=False)
+        freqs, _ = self.evolve(3200, vmean_option=False, sample_option=False, imean_option=False)
         Init_end = time.time()
         if self.print_info:
             print(
@@ -355,7 +355,7 @@ class simulation(object):
                 t_sim_start = time.time()
                 if hp_total is not None:
                     self.block_model.mul_property_by_subblk(population_info, hp_total[i].reshape(-1))
-                out = self.evolve(step, vmean_option=self.vmean_option, sample_option=self.sample_option)
+                out = self.evolve(step, vmean_option=self.vmean_option, sample_option=self.sample_option, imean_option=self.imean_option)
                 FFreqs[j] = torch_2_numpy(out[0])
                 out_base = 1
                 if self.vmean_option:
@@ -363,10 +363,10 @@ class simulation(object):
                     out_base += 1
                 if self.sample_option:
                     Spike[j] = torch_2_numpy(out[out_base])
-                    Vi[j] = Spike[j] = torch_2_numpy(out[out_base + 1])
+                    Vi[j] = torch_2_numpy(out[out_base + 1])
                     out_base += 2
                 if self.imean_option:
-                    Imean[i] = torch_2_numpy(out[out_base])
+                    Imean[j] = torch_2_numpy(out[out_base])
 
                 bolds_out[i, :] = torch_2_numpy(out[-1])
                 t_sim_end = time.time()
@@ -405,7 +405,7 @@ class simulation(object):
         """
 
         info = {'name': self.name, "num_neurons": self.num_neurons, 'num_voxel': self.num_voxels,
-                'num_populations': self.num_populations}
+                'num_populations': self.num_populations, 'step': step}
         table_print(info)
         if hp_path is not None:
             hp_total = np.load(hp_path)
