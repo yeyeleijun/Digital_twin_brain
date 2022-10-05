@@ -521,4 +521,5 @@ dmypy.json
 cython_debug/
 small_blocks/
 results/
+iteration_scheme/fig
 

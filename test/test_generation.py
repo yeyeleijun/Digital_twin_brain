@@ -326,11 +326,12 @@ class TestBlock(unittest.TestCase):
         print("Done")
 
     def _test_make_whole_brain_include_cortical_laminar_and_subcortical_voxel_model(self,
-                                                                                   path="./laminar_structure_whole_brain_include_subcortical/200m_structure_d100",
+                                                                                   path="../data/laminar_brain",
                                                                                    degree=100,
                                                                                    minmum_neurons_for_block=0,
                                                                                    scale=int(2e8),
-                                                                                   blocks=40):
+                                                                                   blocks=40,
+                                                                                init_min=0, init_max=1):
         """
         generate the whole brian connection table at the cortical-column version, and generate index file of populations.
         In simulation, we can use the population_base.npy to sample which neurons we need to track.
@@ -354,7 +355,8 @@ class TestBlock(unittest.TestCase):
 
 
         """
-        os.makedirs(path, exist_ok=True)
+        second_path = self._make_directory_tree(path, scale, degree, init_min, init_max, "normal")
+        # os.makedirs(path, exist_ok=True)
         whole_brain = np.load(
             '/public/home/ssct004t/project/zenglb/spiking_nn_for_simulation/whole_brain_voxel_info.npz')
         conn_prob = whole_brain["conn_prob"]
@@ -393,19 +395,21 @@ class TestBlock(unittest.TestCase):
         population_base = np.array([kword['size'] for kword in kwords], dtype=np.int64)
         population_base = np.add.accumulate(population_base)
         population_base = np.insert(population_base, 0, 0)
-        os.makedirs(os.path.join(path, 'supplementary_info'), exist_ok=True)
-        np.save(os.path.join(path, 'supplementary_info', "population_base.npy"), population_base)
+        # os.makedirs(os.path.join(second_path, 'supplementary_info'), exist_ok=True)
+        np.save(os.path.join(second_path, 'supplementary_info', "population_base.npy"), population_base)
+        cortical_or_not = np.concatenate([np.arange(divide_point, dtype=np.int64), np.arange(divide_point, block_size.shape[0], dtype=np.int64)])
+        np.save(os.path.join(second_path, 'supplementary_info', "cortical_or_not.npy"), cortical_or_not)
 
         conn = connect_for_multi_sparse_block(conn_prob, kwords,
                                               degree=degree,
-                                              init_min=0,
-                                              init_max=1)
+                                              init_min=init_min,
+                                              init_max=init_max)
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
         size = comm.Get_size()
 
         for i in range(rank, blocks, size):
-            merge_dti_distributation_block(conn, path,
+            merge_dti_distributation_block(conn, second_path,
                                            MPI_rank=i,
                                            number=blocks,
                                            dtype="single",
