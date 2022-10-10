@@ -78,6 +78,7 @@ fabric.properties
 .Python
 [Bb]in
 [Ii]nclude
+!cuda/include
 [Ll]ib
 [Ll]ib64
 [Ll]ocal
@@ -522,4 +523,5 @@ cython_debug/
 small_blocks/
 results/
 iteration_scheme/fig
+document/
 

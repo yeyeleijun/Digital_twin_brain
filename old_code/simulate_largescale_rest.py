@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*- 
 # @Time : 2021/12/10 11:20 
 # @Author : lepold
-# @File : simulate_22603_largescale.py
+# @File : simulate_22703_largescale.py
 
 
 import os
@@ -9,7 +9,7 @@ import time
 import numpy as np
 import torch
 from cuda.python.dist_blockwrapper_pytorch import BlockWrapper as block_gpu
-from brain_block.bold_model_pytorch import BOLD
+from models.bold_model_pytorch import BOLD
 import argparse
 from scipy.io import loadmat
 import prettytable as pt

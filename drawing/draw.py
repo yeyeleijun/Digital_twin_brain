@@ -37,8 +37,9 @@ def draw(log_path, freqs, block_size, sample_idx, write_path, name_path, bold_pa
     bold_simulation = np.load(bold_path)
     # bold_simulation = bold_simulation[30:, ]
     T, voxels = bold_simulation.shape
-    bold_y = np.load(real_bold_path)["rest_bold"]
-    bold_y = bold_y.T
+    bold_y = loadmat(real_bold_path)["nii_ts_bandzscore"]
+    rearange_index = np.load("/public/home/ssct004t/project/zenglb/spiking_nn_for_simulation/rearange_index.npy")
+    bold_y = bold_y[:, rearange_index]
     bold_y = 0.01 + 0.03 * (bold_y - bold_y.min()) / (bold_y.max() - bold_y.min())
     real_bold = bold_y[:T, :voxels]
 
