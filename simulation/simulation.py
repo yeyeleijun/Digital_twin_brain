@@ -72,7 +72,7 @@ class simulation(object):
         """
         return np.histogram(a, weights=weights, bins=bins, range=range)[0]
 
-    def __init__(self, ip: str, block_path: str, dt: float, route_path=None, column=True, **kwargs):
+    def __init__(self, ip: str, block_path: str, dt: float = 1., route_path=None, column=True, **kwargs):
         if column:
             self.block_model = block(ip, block_path, dt, route_path=route_path, overlap=10)
             self.populations_per_voxel = 10
@@ -140,7 +140,7 @@ class simulation(object):
         beta = torch.ones(self.num_populations, device="cuda:0") * 1e8
         self.block_model.gamma_property_by_subblk(population_info, alpha, beta, debug=False)
 
-    def sample(self, aal_region, population_base, num_sample_voxel_per_region, num_neurons_per_voxel,
+    def sample(self, aal_region, population_base, num_sample_voxel_per_region=1, num_neurons_per_voxel=300,
                specified_info=None):
         """
 
@@ -309,7 +309,7 @@ class simulation(object):
 
         """
 
-        if not hasattr(self, 'num_sample'):
+        if self.sample_option and not hasattr(self, 'num_sample'):
             raise NotImplementedError('Please set the sampling neurons first in simulation case')
 
         start_time = time.time()
@@ -391,7 +391,7 @@ class simulation(object):
         Parameters
         ----------
 
-        hp_index: int, default is None.
+        hp_index: list, default is None.
 
         hp_path: str, default is None.
 
