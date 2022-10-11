@@ -73,11 +73,11 @@ void reset_membrane_voltage_gpu(const T*  v_rsts,
 }
 
 template<typename T>
-static __global__ void update_membrane_voltage_for_input_kernel(const T* v_rsts,
-																		const T* v_ths,
-																		const unsigned char* f_actives,
+static __global__ void update_membrane_voltage_for_input_kernel(const T* __restrict__ v_rsts,
+																		const T* __restrict__ v_ths,
+																		const unsigned char* __restrict__ f_actives,
 																		const unsigned int n,
-																		T* v_membranes)
+																		T* __restrict__ v_membranes)
 {
 	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	const unsigned int gridSize = blockDim.x * gridDim.x;
@@ -114,20 +114,20 @@ void update_membrane_voltage_for_input_gpu(const T* v_rsts,
 
 
 template<typename T>
-static __global__ void update_membrane_voltage_kernel(const T* i_synaptics,
-															const T* i_ext_stimuli,
-															const T* v_rsts,
-															const T* v_ths,
-															const T* c_membrane_reciprocals,
-															const T* v_leakages,
-															const T* g_leakages,
-															const T* t_refs,
+static __global__ void update_membrane_voltage_kernel(const T* __restrict__ i_synaptics,
+															const T* __restrict__ i_ext_stimuli,
+															const T* __restrict__ v_rsts,
+															const T* __restrict__ v_ths,
+															const T* __restrict__ c_membrane_reciprocals,
+															const T* __restrict__ v_leakages,
+															const T* __restrict__ g_leakages,
+															const T* __restrict__ t_refs,
 															const unsigned int n,
 															const T delta_t,
 															const T t,
-															unsigned char* f_actives,
-															T* t_actives,
-															T* v_membranes)
+															unsigned char* __restrict__ f_actives,
+															T* __restrict__ t_actives,
+															T* __restrict__ v_membranes)
 {
 	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	const unsigned int gridSize = blockDim.x * gridDim.x;

@@ -2700,7 +2700,7 @@ static void snn_init(NodeInfo<T, T2>& node)
 	
 	LOG_INFO << "==========Before snn init=============" << endl;
 	report_dev_info(node.gid_);
-	report_rss();
+	report_mem_info();
 	
 	vector<char> route_json;
 	int mode;
@@ -2748,7 +2748,7 @@ static void snn_init(NodeInfo<T, T2>& node)
 	assert(snn_sync(info) == MPI_SUCCESS);
 	LOG_INFO << "==========After parsing connection table=============" << endl;
 	report_dev_info(node.gid_);
-	report_rss();
+	report_mem_info();
 	
 	vector<MPI_Request> requests;
 	vector<TransTable::BufferRecord> sending_buffs;
@@ -2769,7 +2769,7 @@ static void snn_init(NodeInfo<T, T2>& node)
 
 	LOG_INFO << "==========After snn init=============" << endl;
 	report_dev_info(node.gid_);
-	report_rss();
+	report_mem_info();
 }
 
 template<typename T>

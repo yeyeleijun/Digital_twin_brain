@@ -61,7 +61,7 @@ unsigned int warp_size();
 // random seeding
 unsigned long long gen_seed(); 
 
-void report_rss(double* used_mem = nullptr);
+void report_mem_info(double* used_mem = nullptr);
 void report_dev_info(int device, double* used_mem = nullptr, double* total_mem = nullptr);
 
 bool report_gpu_mem(const int rank, const char* hostname, const double limit);
