@@ -45,7 +45,7 @@ KERNELOBJS :=  src/stage/membrane_voltage.o src/stage/presynaptic_voltage.o src/
 #test: python/BrainBlock test/test_block test/test_multiblock test/test_result tools/dist_simulator
 all: tools/dist_simulator
 benchmark: tools/benchmark
-test: tools/test_json
+test: test/test_json
 
 #src/stage/extern_stimuli.cpp : src/stage/extern_stimuli.cu
 #	$(HIP_PATH)/bin/hipify-perl $< > $@
@@ -182,7 +182,7 @@ tools/dist_simulator: tools/dist_simulator.o $(SRCOBJS) tools/snn.pb.o tools/snn
 tools/benchmark: tools/benchmark.o $(SRCOBJS) tools/snn.pb.o tools/snn.grpc.pb.o 
 	$(HIPCC) -o $@ $+ $(LIBRARIES) `pkg-config --libs protobuf grpc++` -pthread -Wl,--no-as-needed -lgrpc++_reflection -Wl,--as-needed -ldl
 
-tools/test_json: tools/test_json.cpp
+test/test_json: test/test_json.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES)  -o $@ $+ -L./3rdparty/jsoncpp/build/lib -ljsoncpp_static
 
 %.grpc.pb.cc: %.proto
