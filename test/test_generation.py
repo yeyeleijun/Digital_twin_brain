@@ -2,14 +2,15 @@
 # @Time : 2022/8/10 14:31 
 # @Author : lepold
 # @File : test_generation.py
-import os
 import unittest
+
 import h5py
-# from mpi4py import MPI
-import numpy as np
+import sparse
 
 from generation.make_block import *
-import sparse
+
+
+# from mpi4py import MPI
 
 
 class TestBlock(unittest.TestCase):
@@ -45,7 +46,8 @@ class TestBlock(unittest.TestCase):
         """
         os.makedirs(root_path, exist_ok=True)
         os.makedirs(os.path.join(root_path, "raw_data"), exist_ok=True)
-        second_path = os.path.join(root_path, f"dti_distribution_{int(scale//1e6)}m_d{degree}_w{init_min}_{init_max}_{extra_info}")
+        second_path = os.path.join(root_path,
+                                   f"dti_distribution_{int(scale // 1e6)}m_d{degree}_w{init_min}_{init_max}_{extra_info}")
         os.makedirs(second_path, exist_ok=True)
         os.makedirs(os.path.join(second_path, "single"), exist_ok=True)
         os.makedirs(os.path.join(second_path, "ensembles"), exist_ok=True)
@@ -305,7 +307,8 @@ class TestBlock(unittest.TestCase):
             out_conn_prob = out_conn_prob / out_conn_prob.sum(axis=1, keepdims=True)
         return out_conn_prob, out_gm, out_degree_scale
 
-    def test_make_small_block(self, write_path="../data/small_blocks/critical_blocks_d100", initial_parameter=(2.13037975e-02, 1.39240506e-04, 1.58227848e-01, 1.89873418e-02)):
+    def test_make_small_block(self, write_path="../data/small_blocks/critical_blocks_d100",
+                              initial_parameter=(2.13037975e-02, 1.39240506e-04, 1.58227848e-01, 1.89873418e-02)):
         prob = torch.tensor([[0.8, 0.2], [0.8, 0.2]])
         tau_ui = (8, 40, 10, 50)
         population_kwards = [{'g_Li': 0.03,
@@ -317,7 +320,7 @@ class TestBlock(unittest.TestCase):
                               'noise_rate': 0.0003,
                               'size': num} for num in [1600, 400]]
         conn = connect_for_multi_sparse_block(prob, population_kwards, degree=100, init_min=1,
-                                       init_max=1, prefix=None)
+                                              init_max=1, prefix=None)
         merge_dti_distributation_block(conn, write_path,
                                        MPI_rank=None,
                                        number=4,
@@ -326,12 +329,12 @@ class TestBlock(unittest.TestCase):
         print("Done")
 
     def _test_make_whole_brain_include_cortical_laminar_and_subcortical_voxel_model(self,
-                                                                                   path="../data/laminar_brain",
-                                                                                   degree=100,
-                                                                                   minmum_neurons_for_block=0,
-                                                                                   scale=int(2e8),
-                                                                                   blocks=40,
-                                                                                init_min=0, init_max=1):
+                                                                                    path="../data/laminar_brain",
+                                                                                    degree=100,
+                                                                                    minmum_neurons_for_block=200,
+                                                                                    scale=int(2e8),
+                                                                                    blocks=40,
+                                                                                    init_min=0, init_max=1):
         """
         generate the whole brian connection table at the cortical-column version, and generate index file of populations.
         In simulation, we can use the population_base.npy to sample which neurons we need to track.
@@ -388,7 +391,7 @@ class TestBlock(unittest.TestCase):
                    "V_reset": -65,
                    'g_Li': 0.03,
                    'g_ui': gui_laminar[i % 10] if np.isin(i // 10, cortical) else gui_voxel,
-                   "size": int(max(b * scale, minmum_neurons_for_block))
+                   "size": int(max(b * scale, minmum_neurons_for_block)) if b != 0 else 0
                    }
                   for i, b in enumerate(block_size)]
 
@@ -397,7 +400,8 @@ class TestBlock(unittest.TestCase):
         population_base = np.insert(population_base, 0, 0)
         # os.makedirs(os.path.join(second_path, 'supplementary_info'), exist_ok=True)
         np.save(os.path.join(second_path, 'supplementary_info', "population_base.npy"), population_base)
-        cortical_or_not = np.concatenate([np.arange(divide_point, dtype=np.int64), np.arange(divide_point, block_size.shape[0], dtype=np.int64)])
+        cortical_or_not = np.concatenate(
+            [np.arange(divide_point, dtype=np.int64), np.arange(divide_point, block_size.shape[0], dtype=np.int64)])
         np.save(os.path.join(second_path, 'supplementary_info', "cortical_or_not.npy"), cortical_or_not)
 
         conn = connect_for_multi_sparse_block(conn_prob, kwords,
@@ -441,7 +445,8 @@ class TestBlock(unittest.TestCase):
         conn_prob, block_size, degree_scale = self._add_laminar_cortex_model(conn_prob, block_size,
                                                                              canonical_voxel=True)
         # gui = np.array([6.1644921e-03, 8.9986715e-04, 2.9690875e-02, 1.9053727e-03], dtype=np.float64) # old setting, noise rate=0.01, totally steady spike, 1ms iteration
-        gui = np.array([0.01837975, 0.00072405, 0.10759494, 0.02180028], dtype=np.float64)  # find in sub critical in 3hz noise rate and 0.1ms iteration resolution.
+        gui = np.array([0.01837975, 0.00072405, 0.10759494, 0.02180028],
+                       dtype=np.float64)  # find in sub critical in 3hz noise rate and 0.1ms iteration resolution.
         degree = np.maximum((degree * degree_scale).astype(np.uint16), 1)
 
         kwords = [{"V_th": -50,

@@ -6,13 +6,15 @@
 
 import os
 import time
+
 import numpy as np
 import torch
-from default_params import bold_params, v_th
+
 from cuda.python.dist_blockwrapper_pytorch import BlockWrapper as block
+from default_params import bold_params, v_th
 from models.bold_model_pytorch import BOLD
-from utils.pretty_print import pretty_print, table_print
 from utils.helpers import load_if_exist, torch_2_numpy
+from utils.pretty_print import pretty_print, table_print
 from utils.sample import specified_sample
 
 
@@ -140,7 +142,7 @@ class simulation(object):
         beta = torch.ones(self.num_populations, device="cuda:0") * 1e8
         self.block_model.gamma_property_by_subblk(population_info, alpha, beta, debug=False)
 
-    def sample(self, aal_region, population_base, num_sample_voxel_per_region, num_neurons_per_voxel,
+    def sample(self, aal_region, population_base, num_sample_voxel_per_region=1, num_neurons_per_voxel=300,
                specified_info=None):
         """
 
@@ -355,7 +357,8 @@ class simulation(object):
                 t_sim_start = time.time()
                 if hp_total is not None:
                     self.block_model.mul_property_by_subblk(population_info, hp_total[i].reshape(-1))
-                out = self.evolve(step, vmean_option=self.vmean_option, sample_option=self.sample_option, imean_option=self.imean_option)
+                out = self.evolve(step, vmean_option=self.vmean_option, sample_option=self.sample_option,
+                                  imean_option=self.imean_option)
                 FFreqs[j] = torch_2_numpy(out[0])
                 out_base = 1
                 if self.vmean_option:
@@ -391,7 +394,7 @@ class simulation(object):
         Parameters
         ----------
 
-        hp_index: int, default is None.
+        hp_index: list, default is None.
 
         hp_path: str, default is None.
 
