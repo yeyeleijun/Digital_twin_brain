@@ -461,6 +461,7 @@ public:
 	double used_gpu_mem;
 
 	vector<double> computing_duration_;
+	vector<double> routing_duration_;
 	vector<double> reporting_duration_;
 	vector<double> duration_inter_node_;
 	vector<double> duration_intra_node_;
@@ -469,6 +470,10 @@ public:
 	vector<uint64_t> sending_byte_size_intra_node_;
 	vector<uint64_t> recving_byte_size_inter_node_;
 	vector<uint64_t> recving_byte_size_intra_node_;
+
+	vector<double> flops_update_v_membrane_;
+	vector<double> flops_update_j_presynaptic_;
+	vector<double> flops_update_i_synaptic_;
 };
 
 static void init_mpi_env(int* argc, char*** argv, int& rank, int& gpu_id, int& size, string& name)
@@ -1957,7 +1962,7 @@ static void snn_init(NodeInfo<T, T2>& node)
 	
 	LOG_INFO << "==========Before snn init=============" << endl;
 	report_dev_info(node.gid_);
-	report_rss();
+	report_mem_info();
 	
 	vector<char> route_json;
 	int mode;
@@ -2017,7 +2022,7 @@ static void snn_init(NodeInfo<T, T2>& node)
 	node.block_->f_receiving_colinds_->free_cpu_data();
 
 	LOG_INFO << "==========After snn init=============" << endl;
-	report_rss(&node.used_cpu_mem);
+	report_mem_info(&node.used_cpu_mem);
 	report_dev_info(node.gid_, &node.used_gpu_mem, &node.total_gpu_mem);
 }
 
@@ -2309,6 +2314,7 @@ static void route_routine(NodeInfo<T, T2>& node,
 									hipMemcpyDeviceToHost));
 			duration<double> diff = steady_clock::now() - computing_start;
 			node.computing_duration_[iter] += diff.count();
+			node.routing_duration_[iter] += diff.count();
 		}
 
 		has_union = true;
@@ -2800,6 +2806,7 @@ static void snn_run(NodeInfo<T, T2>& node)
 	}
 
 	node.computing_duration_.resize(node.iter_);
+	node.routing_duration_.resize(node.iter_);
 	node.reporting_duration_.resize(node.iter_);
 	node.duration_inter_node_.resize(node.iter_);
 	node.duration_intra_node_.resize(node.iter_);
@@ -2886,12 +2893,29 @@ static void snn_run(NodeInfo<T, T2>& node)
 
 	for(int i = 0; i < node.iter_; i++)
 	{
+		node.computing_duration_[i] = 0.;
+		
 		computing_start = steady_clock::now();
-
 		node.block_->update_time();
 		timestamp_offset = node.block_->update_F_input_spike_gpu(static_cast<unsigned int>(i + node.iter_offset_),
 																timestamp_offset);
+		HIP_CHECK(hipDeviceSynchronize());
+		diff = steady_clock::now() - computing_start;
+		node.computing_duration_[i] += diff.count();
+
+		{
+			int count = thrust::count(thrust::device_pointer_cast(node.block_->get_()), 
+									thrust::device_pointer_cast(node.block_->get_V_membranes_gpu() + node.block_->get_total_neurons()), );
+		}
+		
+		computing_start = steady_clock::now();
 		node.block_->update_V_membrane_gpu();
+		HIP_CHECK(hipDeviceSynchronize());
+		diff = steady_clock::now() - computing_start;
+		node.computing_duration_[i] += diff.count();
+		
+		
+		computing_start = steady_clock::now();
 		
 		if(node.has_freq_)
 		{
@@ -2940,6 +2964,9 @@ static void snn_run(NodeInfo<T, T2>& node)
 			}
 		}
 
+		assert(snn_sync(info) == MPI_SUCCESS);
+
+		node.routing_duration_[i] = 0.;
 		node.duration_inter_node_[i] = 0.;
 		node.duration_intra_node_[i] = 0.;
 		node.sending_byte_size_inter_node_[i] = 0;
@@ -3207,6 +3234,7 @@ static void snn_name_report(const MPIInfo& info,
 
 static void snn_metric_report(const MPIInfo& info,
 							double* computing_duration,
+							double* routing_duration,
 							double* reporting_duration,
 							double* duration_inter_node,
 							double* duration_intra_node,
@@ -3223,6 +3251,14 @@ static void snn_metric_report(const MPIInfo& info,
 	err = snn_gather(info, &data, 1,
 			MPI_DOUBLE, computing_duration, 1, MPI_DOUBLE);
 	assert(err == MPI_SUCCESS);
+
+	err = snn_gather(info, &data, 1,
+			MPI_DOUBLE, routing_duration, 1, MPI_DOUBLE);
+	assert(err == MPI_SUCCESS);
+
+	err = snn_gather(*node.info_, &node.routing_duration_[i], 1,
+				MPI_DOUBLE, NULL, 1, MPI_DOUBLE);
+		assert(err == MPI_SUCCESS);
 
 	err = snn_gather(info, &data, 1,
 			MPI_DOUBLE, reporting_duration, 1, MPI_DOUBLE);
@@ -4513,6 +4549,7 @@ class SnnImpl final : public Snn::Service
 		
 		for(int i = 0; i < iter_; i++)
 		{
+			assert(MPI_SUCCESS == snn_sync(*info_));
 			snn_run_report<float>(*info_,
 								has_freq,
 								freqs.data(),
@@ -4574,6 +4611,7 @@ class SnnImpl final : public Snn::Service
 		snn_name_report(*info_, node_names);
 		
 		vector<double> computing_duration(info_->size_);
+		vector<double> routing_duration(info_->size_);
 		vector<double> reporting_duration(info_->size_);
 		vector<double> duration_inter_node(info_->size_);
 		vector<double> duration_intra_node(info_->size_);
@@ -4586,6 +4624,7 @@ class SnnImpl final : public Snn::Service
 		{
 			snn_metric_report(*info_,
 							computing_duration.data(),
+							routing_duration.data(),
 							reporting_duration.data(),
 							duration_inter_node.data(),
 							duration_intra_node.data(),
@@ -4601,6 +4640,7 @@ class SnnImpl final : public Snn::Service
 				MetricInfo* metric = response.add_metric();
 				metric->set_name(node_names[j - 1]);
 				metric->set_computing_duration(computing_duration[j]);
+				metric->set_routing_duration(routing_duration[j]);
 				metric->set_reporting_duration(reporting_duration[j]);
 				metric->set_duration_inter_node(duration_inter_node[j]);
 				metric->set_duration_intra_node(duration_intra_node[j]);

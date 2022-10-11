@@ -96,13 +96,17 @@ message MetricRequest {
 message MetricInfo{
 	string name = 1;
 	double computing_duration = 2;
-	double reporting_duration = 3;
-	double duration_inter_node = 4;
-	double duration_intra_node = 5;
-	uint64 sending_byte_size_inter_node = 6;
-	uint64 sending_byte_size_intra_node = 7;
-	uint64 recving_byte_size_inter_node = 8;
-	uint64 recving_byte_size_intra_node = 9;
+	double routing_duration = 3;
+	double reporting_duration = 4;
+	double duration_inter_node = 5;
+	double duration_intra_node = 6;
+	uint64 sending_byte_size_inter_node = 7;
+	uint64 sending_byte_size_intra_node = 8;
+	uint64 recving_byte_size_inter_node = 9;
+	uint64 recving_byte_size_intra_node = 10;
+	//double flops_update_v_membrane = 11;
+	//double flops_update_j_presynaptic = 12;
+	//double flops_update_i_synaptic = 13;
 }
 
 message MetricResponse {

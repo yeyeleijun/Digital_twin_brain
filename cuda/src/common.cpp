@@ -95,21 +95,27 @@ bool report_mem(const int rank, const char* hostname, const double limit)
 }
 
 
-void report_rss(double* used_mem) 
+void report_mem_info(double* used_mem) 
 {
 	size_t i = 0UL;
+	int count = 0;
 	FILE* file = fopen("/proc/self/status", "r");
 	char line[128];
 	while (fgets(line, sizeof(line), file) != nullptr) 
 	{
-		if(strncmp(line, "VmRSS:", 6) == 0)
+		if(strncmp(line, "VmRSS:", 6) == 0 || strncmp(line, "VmPin:", 6) == 0)
 		{
-			i = strlen(line);
+			size_t j = strlen(line);
 			const char* p = line;
 			while (*p <'0' || *p > '9') p++;
-			line[i - 3] = '\0';
-			i = (size_t)atol(p);
-			break;
+			line[j - 3] = '\0';
+			i += (size_t)atol(p);
+			count++;
+			
+			if(2 == count)
+			{
+				break;
+			}
 		}
 	}
 	fclose(file);

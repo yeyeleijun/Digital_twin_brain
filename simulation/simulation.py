@@ -74,7 +74,7 @@ class simulation(object):
         """
         return np.histogram(a, weights=weights, bins=bins, range=range)[0]
 
-    def __init__(self, ip: str, block_path: str, dt: float, route_path=None, column=True, **kwargs):
+    def __init__(self, ip: str, block_path: str, dt: float = 1., route_path=None, column=True, **kwargs):
         if column:
             self.block_model = block(ip, block_path, dt, route_path=route_path, overlap=10)
             self.populations_per_voxel = 10
@@ -311,7 +311,7 @@ class simulation(object):
 
         """
 
-        if not hasattr(self, 'num_sample'):
+        if self.sample_option and not hasattr(self, 'num_sample'):
             raise NotImplementedError('Please set the sampling neurons first in simulation case')
 
         start_time = time.time()
