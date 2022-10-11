@@ -286,8 +286,8 @@ class simulation(object):
             out += (temp_vmean,)
             out_base += 1
         if sample_option:
-            temp_vsample = torch.stack([x[out_base] for x in total_res], dim=0)
-            temp_spike = torch.stack([x[out_base + 1] for x in total_res], dim=0)
+            temp_spike = torch.stack([x[out_base] for x in total_res], dim=0)
+            temp_vsample = torch.stack([x[out_base + 1] for x in total_res], dim=0)
             temp_spike &= (torch.abs(temp_vsample - v_th) / 50 < 1e-5)
             out += (temp_spike, temp_vsample,)
             out_base += 2
