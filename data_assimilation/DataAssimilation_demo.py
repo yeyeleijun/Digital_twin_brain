@@ -126,15 +126,16 @@ def task_demo(args):
 
 def rest_simulation(args):
     property_index = np.array([int(s) for s in args.para_ind.split()]).reshape(-1)
-    path_out = args.path_out + '/simulation/'
+    path_out = args.path_out + args.label
     os.makedirs(path_out, exist_ok=True)
-    os.makedirs(path_out + 'figure/', exist_ok=True)
+    os.makedirs(path_out + '/figure/', exist_ok=True)
     bold_real = get_bold_signal(args.bold_path, b_min=0.02, b_max=0.05, lag=0)
     da_simulation = simulation(args.ip, args.block_path, dt=1, column=False, print_info=True, write_path=path_out)
     da_simulation.clear_mode()
-    # hp_after_da = np.load(args.path_out + args.gui_path)
-    hp_after_da = np.array([float(s) for s in args.gui_real.split()]).reshape(-1)
-    hp_after_da = np.tile(hp_after_da, [50, da_simulation.num_populations, 1])[:, :, property_index-10]
+    da_simulation.block_model.print_stat = True
+    hp_after_da = np.load(args.path_out + args.gui_path)
+    #hp_after_da = np.array([float(s) for s in args.gui_real.split()]).reshape(-1)
+    #hp_after_da = np.tile(hp_after_da, [50, da_simulation.num_populations, 1])[:, :, property_index-10]
     observation_time, num_da_population_pblk, hp_num = hp_after_da.shape
     print(observation_time, num_da_population_pblk, hp_num)
     hp_after_da = torch.from_numpy(hp_after_da.astype(np.float32)).cuda()
