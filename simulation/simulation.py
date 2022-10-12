@@ -6,10 +6,9 @@
 
 import os
 import time
-
 import numpy as np
 import torch
-
+from scipy.io import savemat
 from cuda.python.dist_blockwrapper_pytorch import BlockWrapper as block
 from default_params import bold_params, v_th
 from models.bold_model_pytorch import BOLD
@@ -375,6 +374,11 @@ class simulation(object):
                 t_sim_end = time.time()
                 print(
                     f"{i}th observation_time, mean fre: {torch.mean(torch.mean(out[0] / self.block_model.neurons_per_subblk.float() * 1000, dim=0)):.1f}, cost time {t_sim_end - t_sim_start:.1f}")
+                if self.print_info:
+                    stat_data, stat_table = self.block_model.last_time_stat()
+                    np.save(os.path.join(self.write_path, f"stat_{i}.npy"), stat_data)
+                    stat_table.to_csv(os.path.join(self.write_path, f"stat_{i}.csv"))
+                    print('print_stat_time', time.time()-t_sim_end, stat_table)
             if self.sample_option:
                 np.save(os.path.join(self.write_path, f"spike_{state}_assim_{ii}.npy"), Spike)
                 np.save(os.path.join(self.write_path, f"vi_{state}_assim_{ii}.npy"), Vi)
@@ -384,6 +388,7 @@ class simulation(object):
                 np.save(os.path.join(self.write_path, f"imean_{state}_assim_{ii}.npy"), Imean)
             # np.save(os.path.join(self.write_path, f"freqs_{state}_assim_{ii}.npy"), FFreqs)
             np.save(os.path.join(self.write_path, f"bold_{state}_assim.npy"), bolds_out)
+            savemat(os.path.join(self.write_path, f"bold_{state}_assim.mat"), {'bolds_out': bolds_out})
 
         pretty_print(f"Totally have Done, Cost time {time.time() - start_time:.2f} ")
 

@@ -132,19 +132,17 @@ class BlockWrapper:
 
     def last_time_stat(self):
         responses = self._stub.Measure(MetricRequest())
-        rows = ["sending",
-                "recving",
-                "routing",
-                "computing",
-                "reporting",
-                "copy_before_sending",
-                "copy_after_recving",
-                "parse_merge",
-                "route_computing",
-                "copy_before_reporting"]
+        rows = ["computing_duration",
+                "reporting_duration",
+                "duration_inter_node",
+                "duration_intra_node",
+                "sending_byte_size_inter_node",
+                "sending_byte_size_intra_node",
+                "recving_byte_size_inter_node",
+                "recving_byte_size_intra_node"]
 
         col = OrderedDict([('total_mean', lambda x: np.mean(x)),
-                           ('total_std',  lambda x:  np.std(x)),
+                           ('total_std', lambda x:  np.std(x)),
                            ('spatial_max_temporal_mean', lambda x: np.mean(np.max(x, axis=1), axis=0)),
                            ('spatial_argmax_temporal_mode', lambda x: stats.mode(np.argmax(x, axis=1), axis=None)[0]),
                            ('temporal_std_spatial_max', lambda x: np.max(np.std(x, axis=0), axis=0)),
@@ -153,17 +151,18 @@ class BlockWrapper:
         name = []
         data = []
         for i, resps in enumerate(responses):
-            d=[]
+            d = []
+
             for resp in resps.metric:
                 if i == 0:
                     name.append(resp.name)
-                d.append([getattr(resp,  row+"_duration") for row in rows])
+                d.append([getattr(resp,  row) for row in rows])
             data.append(d)
 
         data = np.array(data)
         stat_data = [[f(data[:, :, i]) for f in col.values()] for i in range(len(rows))]
         table = pd.DataFrame(np.array(stat_data), index=pd.Index(rows), columns=list(col.keys()))
-        return table
+        return data, table
 
     def _merge_sbblk(self, array, weight=None):
         assert len(array.shape) in {1, 2} and array.shape[-1] == self._neurons_per_subblk.shape[0], \
@@ -276,7 +275,7 @@ class BlockWrapper:
         if self.print_stat:
             _recv_time = process_thread.get()
             print('run merge time: {}, recv time: {}'.format(_run_time, _recv_time))
-            print(self.last_time_stat())
+            # print(self.last_time_stat())
         else:
             process_thread.wait()
 
