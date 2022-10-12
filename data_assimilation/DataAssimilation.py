@@ -237,14 +237,16 @@ class DataAssimilation(simulation):
         self._hp_low = gui_low_ppopu.reshape(-1).type_as(self.type_float)
         self._hp_high = gui_high_ppopu.reshape(-1).type_as(self.type_float)
         # method 1
-        self._hp_log = torch.linspace(-20, 20, self.ensemble_number).repeat_interleave(len(self._hp_low))
+        # self._hp_log = torch.linspace(-7, 7, self.ensemble_number).repeat_interleave(len(self._hp_low))
+        temp = torch.linspace(-1/3, 1/3, self.ensemble_number)
+        self._hp_log = 10*(torch.log(temp + 1) - torch.log(1 - temp)).repeat_interleave(len(self._hp_low))
         self._hp_log = self._hp_log.type_as(self.type_float).reshape(self.ensemble_number, -1, self._hp_num)
         for i in range(self._hp_num):
             idx = np.random.choice(self.ensemble_number, self.ensemble_number, replace=False)
             self._hp_log[:, :, i] = self._hp_log[idx, :, i]
         self._hp_log = self._hp_log.reshape(self.ensemble_number, -1)
         # method 2
-        # self._hp_log = 40 * torch.rand((self.ensemble_number,)+ self._hp_low.shape) - 20
+        # self._hp_log = 14 * torch.rand((self.ensemble_number,)+ self._hp_low.shape) - 7
         self._hp = self.sigmoid_torch(self._hp_log, self._hp_low, self._hp_high).type_as(self.type_float)
         print(self._hp.shape)
         return self._hp.reshape(-1)
@@ -348,7 +350,7 @@ class DataAssimilation(simulation):
             print(f'(Frequency.max, mean, min)={out[:, :, 0].max(), out[:, :, 0].mean(), out[:, :, 0].min()}')
             print(f'(BOLD.max, mean, min)={out[:, :, -1].max(), out[:, :, -1].mean(), out[:, :, -1].min()}')
 
-    def da_evolve(self, steps=800, hp_sigma=1):
+    def da_evolve(self, steps=800, hp_sigma=0.25):
         """
         The block evolve one TR time, i.e, 800 ms as default setting.
 
@@ -431,10 +433,11 @@ class DataAssimilation(simulation):
                 np.save(os.path.join(write_path, "w.npy"), w_save)
                 np.save(os.path.join(write_path, "w_fix.npy"), w_fix)
             print("------------run da" + str(t) + ":" + str(time.time() - start_time))
-        bold_assimilation = np.stack(w_save)[:, :, :, -1]
-        print(np.stack(w_save).shape)
-        hp_save_log = np.stack(w_save)[:, :, :, :-6].reshape(observation_times, self.ensemble_number, -1)
-        del w_fix, w_save
+        del w_fix
+        w_save = np.stack(w_save)
+        bold_assimilation = w_save[:, :, :, -1]
+        hp_save_log = w_save[:, :, :, :-6].reshape(observation_times, self.ensemble_number, -1)
+        del w_save
         np.save(os.path.join(write_path, "bold_assimilation.npy"), bold_assimilation)
         self.plot_bold(write_path, torch2numpy(bold_real), bold_assimilation, np.arange(10))
         hp_save_log = hp_save_log[:, :, torch2numpy(self.from_hidden_state)].reshape(observation_times,
