@@ -3,13 +3,9 @@
 # @Author : lepold
 # @File : test_generation.py
 import unittest
-
 import h5py
 import sparse
-
 from generation.make_block import *
-
-
 # from mpi4py import MPI
 
 
@@ -359,7 +355,6 @@ class TestBlock(unittest.TestCase):
 
         """
         second_path = self._make_directory_tree(path, scale, degree, init_min, init_max, "normal")
-        # os.makedirs(path, exist_ok=True)
         whole_brain = np.load(
             '/public/home/ssct004t/project/zenglb/spiking_nn_for_simulation/whole_brain_voxel_info.npz')
         conn_prob = whole_brain["conn_prob"]
@@ -398,7 +393,6 @@ class TestBlock(unittest.TestCase):
         population_base = np.array([kword['size'] for kword in kwords], dtype=np.int64)
         population_base = np.add.accumulate(population_base)
         population_base = np.insert(population_base, 0, 0)
-        # os.makedirs(os.path.join(second_path, 'supplementary_info'), exist_ok=True)
         np.save(os.path.join(second_path, 'supplementary_info', "population_base.npy"), population_base)
         cortical_or_not = np.concatenate(
             [np.arange(divide_point, dtype=np.int64), np.arange(divide_point, block_size.shape[0], dtype=np.int64)])
@@ -465,8 +459,8 @@ class TestBlock(unittest.TestCase):
 
         conn = connect_for_multi_sparse_block(conn_prob, kwords,
                                               degree=degree,
-                                              init_min=1,  # have modified as in the criticalNN experiment.
-                                              init_max=1)
+                                              init_min=init_min,  # have modified as in the criticalNN experiment.
+                                              init_max=init_max)
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
         size = comm.Get_size()

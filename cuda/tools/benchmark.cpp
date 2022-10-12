@@ -2898,25 +2898,9 @@ static void snn_run(NodeInfo<T, T2>& node)
 		computing_start = steady_clock::now();
 		node.block_->update_time();
 		timestamp_offset = node.block_->update_F_input_spike_gpu(static_cast<unsigned int>(i + node.iter_offset_),
-																timestamp_offset);
-		HIP_CHECK(hipDeviceSynchronize());
-		diff = steady_clock::now() - computing_start;
-		node.computing_duration_[i] += diff.count();
-
-		{
-			int count = thrust::count(thrust::device_pointer_cast(node.block_->get_()), 
-									thrust::device_pointer_cast(node.block_->get_V_membranes_gpu() + node.block_->get_total_neurons()), );
-		}
-		
-		computing_start = steady_clock::now();
+																timestamp_offset);	
 		node.block_->update_V_membrane_gpu();
-		HIP_CHECK(hipDeviceSynchronize());
-		diff = steady_clock::now() - computing_start;
-		node.computing_duration_[i] += diff.count();
-		
-		
-		computing_start = steady_clock::now();
-		
+	
 		if(node.has_freq_)
 		{
 			node.block_->stat_Freqs_gpu();
