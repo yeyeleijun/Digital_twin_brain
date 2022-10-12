@@ -32,7 +32,29 @@ class BlockWrapper:
     MAX_MESSAGE_LENGTH = 2147483647
     buffersize = 1024 ** 3 // 4
 
-    def __init__(self, address, path, delta_t, route_path=None, print_stat=False, force_rebase=False, overlap=2):
+    def __init__(self, address, path, delta_t, route_path=None, print_stat=False, force_rebase=False, allow_rebase=True, overlap=2):
+        """
+        Block api
+
+        Parameters
+        ----------
+        address: str
+            listening ip of server
+        path: str
+            block path
+        delta_t: float
+            default is 1.
+        route_path: str
+            route path
+        print_stat: bool
+            whether to print detailed info
+        force_rebase: bool
+            if allow_rebase and the force_rebase option is True, we will forcibly accumulate the population id of each card
+        allow_rebase: bool
+            default True, if False, it will never accumulate the population id (if you clearly know that the block only contain one ensemble)
+        overlap: int
+            the population size of each voxel.
+        """
         self.print_stat = print_stat
         self._channel = grpc.insecure_channel(address,
             options = [('grpc.max_send_message_length', self.MAX_MESSAGE_LENGTH),
@@ -64,7 +86,7 @@ class BlockWrapper:
             for j, sinfo in enumerate(resp.subblk_info):
                 if j == 0 and sinfo.subblk_id == cortical_subblk_start and len(subblk_info) > 0:
                     new_base = max([id for id, _ in subblk_info])
-                    if force_rebase or new_base != cortical_subblk_start:
+                    if allow_rebase and (force_rebase or new_base != cortical_subblk_start):
                         subblk_base = (new_base + overlap - 1) // overlap * overlap
                 subblk_info.append((sinfo.subblk_id + subblk_base, sinfo.subblk_num))
             self._subblk_id_per_block[resp.block_id] = \

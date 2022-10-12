@@ -6,9 +6,11 @@
 
 import os
 import time
+
 import numpy as np
 import torch
 from scipy.io import savemat
+
 from cuda.python.dist_blockwrapper_pytorch import BlockWrapper as block
 from default_params import bold_params, v_th
 from models.bold_model_pytorch import BOLD
@@ -386,7 +388,7 @@ class simulation(object):
                 np.save(os.path.join(self.write_path, f"vmean_{state}_assim_{ii}.npy"), Vmean)
             if self.imean_option:
                 np.save(os.path.join(self.write_path, f"imean_{state}_assim_{ii}.npy"), Imean)
-            # np.save(os.path.join(self.write_path, f"freqs_{state}_assim_{ii}.npy"), FFreqs)
+            np.save(os.path.join(self.write_path, f"freqs_{state}_assim_{ii}.npy"), FFreqs)
             np.save(os.path.join(self.write_path, f"bold_{state}_assim.npy"), bolds_out)
             savemat(os.path.join(self.write_path, f"bold_{state}_assim.mat"), {'bolds_out': bolds_out})
 
