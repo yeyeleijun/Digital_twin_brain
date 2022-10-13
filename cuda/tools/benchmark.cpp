@@ -3240,7 +3240,7 @@ static void snn_metric_report(const MPIInfo& info,
 			MPI_DOUBLE, routing_duration, 1, MPI_DOUBLE);
 	assert(err == MPI_SUCCESS);
 
-	err = snn_gather(*node.info_, &node.routing_duration_[i], 1,
+	err = snn_gather(info, &routing_duration, 1,
 				MPI_DOUBLE, NULL, 1, MPI_DOUBLE);
 		assert(err == MPI_SUCCESS);
 
@@ -3291,6 +3291,10 @@ static void snn_metric_report(NodeInfo<T, T2>& node)
 	for(int i = 0; i < node.iter_; i++)
 	{
 		err = snn_gather(*node.info_, &node.computing_duration_[i], 1,
+				MPI_DOUBLE, NULL, 1, MPI_DOUBLE);
+		assert(err == MPI_SUCCESS);
+
+		err = snn_gather(*node.info_, &node.routing_duration_[i], 1,
 				MPI_DOUBLE, NULL, 1, MPI_DOUBLE);
 		assert(err == MPI_SUCCESS);
 
