@@ -2,10 +2,16 @@
 # @Time : 2022/8/10 14:31 
 # @Author : lepold
 # @File : test_generation.py
+
+
 import unittest
+
 import h5py
 import sparse
+
 from generation.make_block import *
+
+
 # from mpi4py import MPI
 
 
@@ -313,7 +319,6 @@ class TestBlock(unittest.TestCase):
                               "V_reset": -65,
                               "noise_rate": 0.0003,
                               'tao_ui': tau_ui,
-                              'noise_rate': 0.0003,
                               'size': num} for num in [1600, 400]]
         conn = connect_for_multi_sparse_block(prob, population_kwards, degree=100, init_min=1,
                                               init_max=1, prefix=None)
