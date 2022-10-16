@@ -133,6 +133,7 @@ def rest_simulation(args):
     da_simulation = simulation(args.ip, args.block_path, dt=1, column=False, print_info=True, write_path=path_out)
     da_simulation.clear_mode()
     da_simulation.block_model.print_stat = True
+    da_simulation.print_info = True
     hp_after_da = np.load(args.path_out + args.gui_path)
     #hp_after_da = np.array([float(s) for s in args.gui_real.split()]).reshape(-1)
     #hp_after_da = np.tile(hp_after_da, [50, da_simulation.num_populations, 1])[:, :, property_index-10]

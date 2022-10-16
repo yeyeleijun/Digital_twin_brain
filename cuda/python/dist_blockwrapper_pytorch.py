@@ -155,6 +155,7 @@ class BlockWrapper:
     def last_time_stat(self):
         responses = self._stub.Measure(MetricRequest())
         rows = ["computing_duration",
+                "routing_duration",
                 "reporting_duration",
                 "duration_inter_node",
                 "duration_intra_node",
