@@ -8,11 +8,12 @@ import os
 import time
 import numpy as np
 import torch
-from default_params import bold_params, v_th
+from scipy.io import savemat
 from cuda.python.dist_blockwrapper_pytorch import BlockWrapper as block
+from default_params import bold_params, v_th
 from models.bold_model_pytorch import BOLD
-from utils.pretty_print import pretty_print, table_print
 from utils.helpers import load_if_exist, torch_2_numpy
+from utils.pretty_print import pretty_print, table_print
 from utils.sample import specified_sample
 
 
@@ -72,7 +73,7 @@ class simulation(object):
         """
         return np.histogram(a, weights=weights, bins=bins, range=range)[0]
 
-    def __init__(self, ip: str, block_path: str, dt: float, route_path=None, column=True, **kwargs):
+    def __init__(self, ip: str, block_path: str, dt: float = 1., route_path=None, column=True, **kwargs):
         if column:
             self.block_model = block(ip, block_path, dt, route_path=route_path, overlap=10)
             self.populations_per_voxel = 10
@@ -140,7 +141,7 @@ class simulation(object):
         beta = torch.ones(self.num_populations, device="cuda:0") * 1e8
         self.block_model.gamma_property_by_subblk(population_info, alpha, beta, debug=False)
 
-    def sample(self, aal_region, population_base, num_sample_voxel_per_region, num_neurons_per_voxel,
+    def sample(self, aal_region, population_base, num_sample_voxel_per_region=1, num_neurons_per_voxel=300,
                specified_info=None):
         """
 
@@ -284,8 +285,8 @@ class simulation(object):
             out += (temp_vmean,)
             out_base += 1
         if sample_option:
-            temp_vsample = torch.stack([x[out_base] for x in total_res], dim=0)
-            temp_spike = torch.stack([x[out_base + 1] for x in total_res], dim=0)
+            temp_spike = torch.stack([x[out_base] for x in total_res], dim=0)
+            temp_vsample = torch.stack([x[out_base + 1] for x in total_res], dim=0)
             temp_spike &= (torch.abs(temp_vsample - v_th) / 50 < 1e-5)
             out += (temp_spike, temp_vsample,)
             out_base += 2
@@ -309,7 +310,7 @@ class simulation(object):
 
         """
 
-        if not hasattr(self, 'num_sample'):
+        if self.sample_option and not hasattr(self, 'num_sample'):
             raise NotImplementedError('Please set the sampling neurons first in simulation case')
 
         start_time = time.time()
@@ -355,7 +356,8 @@ class simulation(object):
                 t_sim_start = time.time()
                 if hp_total is not None:
                     self.block_model.mul_property_by_subblk(population_info, hp_total[i].reshape(-1))
-                out = self.evolve(step, vmean_option=self.vmean_option, sample_option=self.sample_option, imean_option=self.imean_option)
+                out = self.evolve(step, vmean_option=self.vmean_option, sample_option=self.sample_option,
+                                  imean_option=self.imean_option)
                 FFreqs[j] = torch_2_numpy(out[0])
                 out_base = 1
                 if self.vmean_option:
@@ -372,6 +374,11 @@ class simulation(object):
                 t_sim_end = time.time()
                 print(
                     f"{i}th observation_time, mean fre: {torch.mean(torch.mean(out[0] / self.block_model.neurons_per_subblk.float() * 1000, dim=0)):.1f}, cost time {t_sim_end - t_sim_start:.1f}")
+                if self.print_info:
+                    stat_data, stat_table = self.block_model.last_time_stat()
+                    np.save(os.path.join(self.write_path, f"stat_{i}.npy"), stat_data)
+                    stat_table.to_csv(os.path.join(self.write_path, f"stat_{i}.csv"))
+                    print('print_stat_time', time.time()-t_sim_end, stat_table)
             if self.sample_option:
                 np.save(os.path.join(self.write_path, f"spike_{state}_assim_{ii}.npy"), Spike)
                 np.save(os.path.join(self.write_path, f"vi_{state}_assim_{ii}.npy"), Vi)
@@ -379,8 +386,9 @@ class simulation(object):
                 np.save(os.path.join(self.write_path, f"vmean_{state}_assim_{ii}.npy"), Vmean)
             if self.imean_option:
                 np.save(os.path.join(self.write_path, f"imean_{state}_assim_{ii}.npy"), Imean)
-            # np.save(os.path.join(self.write_path, f"freqs_{state}_assim_{ii}.npy"), FFreqs)
+            np.save(os.path.join(self.write_path, f"freqs_{state}_assim_{ii}.npy"), FFreqs)
             np.save(os.path.join(self.write_path, f"bold_{state}_assim.npy"), bolds_out)
+            savemat(os.path.join(self.write_path, f"bold_{state}_assim.mat"), {'bolds_out': bolds_out})
 
         pretty_print(f"Totally have Done, Cost time {time.time() - start_time:.2f} ")
 
@@ -391,7 +399,7 @@ class simulation(object):
         Parameters
         ----------
 
-        hp_index: int, default is None.
+        hp_index: list, default is None.
 
         hp_path: str, default is None.
 
