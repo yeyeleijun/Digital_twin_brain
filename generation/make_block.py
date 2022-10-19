@@ -402,7 +402,8 @@ def generate_block_node_property(size=1000,
     this function support broadcast, e.g, C can be a scalar for a total block or a [E_number, I_number] tensor for total nodes.
 
     """
-
+    if e == -1:
+        e = size
     assert 0 <= s <= e <= size
 
     property = np.zeros([e - s, 22], dtype=np.float32)
